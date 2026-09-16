@@ -13,6 +13,7 @@ import type {
   TunnelRequestEvent,
   TunnelSession,
   UpdateTunnelParams,
+  WireboxWebSocket,
 } from "./types.js";
 
 // ============================================================================
@@ -41,6 +42,33 @@ interface OutboundHttpErrorMessage {
   id: string;
   error: string;
 }
+
+interface InboundWsOpenMessage {
+  type: "ws_open";
+  connId: string;
+  path: string;
+  headers: Record<string, string>;
+}
+
+interface InboundWsFrameMessage {
+  type: "ws_frame";
+  connId: string;
+  data: string;
+  binary?: boolean;
+}
+
+interface InboundWsCloseMessage {
+  type: "ws_close";
+  connId: string;
+  code?: number;
+  reason?: string;
+}
+
+type InboundTunnelMessage =
+  | InboundHttpRequestMessage
+  | InboundWsOpenMessage
+  | InboundWsFrameMessage
+  | InboundWsCloseMessage;
 
 /**
  * Resolves the WebSocket constructor for the current environment.
@@ -94,6 +122,10 @@ function normalizeForwardTo(target?: string | number): string {
  * Converts a Base64 string to an ArrayBuffer
  */
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(base64, "base64");
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  }
   const binary = atob(base64);
   const len = binary.length;
   const bytes = new Uint8Array(len);
@@ -104,15 +136,142 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Converts an ArrayBuffer to a Base64 string
+ * Converts a Base64 string to a Uint8Array
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function base64ToUint8Array(base64: string): Uint8Array {
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(base64, "base64");
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  }
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Converts an ArrayBuffer, Uint8Array, or ArrayBufferView to a Base64 string
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array | ArrayBufferView): string {
+  const bytes =
+    buffer instanceof Uint8Array
+      ? buffer
+      : ArrayBuffer.isView(buffer)
+      ? new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+      : new Uint8Array(buffer);
+
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
+  }
+
   let binary = "";
-  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]!);
   }
   return btoa(binary);
+}
+
+/**
+ * In-memory WebSocket implementation passed to custom wsHandler callbacks.
+ */
+class InProcessWebSocket implements WireboxWebSocket {
+  readonly connId: string;
+  readonly path: string;
+  readonly headers: Record<string, string>;
+  private readonly _sendToTunnel: (msg: any) => void;
+  private readonly _listeners: {
+    message: Array<(data: string | Uint8Array, isBinary: boolean) => void>;
+    close: Array<(code: number, reason: string) => void>;
+    error: Array<(error: Error) => void>;
+  } = {
+    message: [],
+    close: [],
+    error: [],
+  };
+
+  constructor(
+    connId: string,
+    path: string,
+    headers: Record<string, string>,
+    sendToTunnel: (msg: any) => void
+  ) {
+    this.connId = connId;
+    this.path = path;
+    this.headers = headers;
+    this._sendToTunnel = sendToTunnel;
+  }
+
+  send(data: string | Uint8Array | ArrayBuffer): void {
+    let frameData: string;
+    let isBinary = false;
+    if (typeof data === "string") {
+      frameData = data;
+      isBinary = false;
+    } else if (data instanceof ArrayBuffer) {
+      frameData = arrayBufferToBase64(data);
+      isBinary = true;
+    } else if (ArrayBuffer.isView(data)) {
+      frameData = arrayBufferToBase64(data);
+      isBinary = true;
+    } else {
+      frameData = String(data);
+    }
+    this._sendToTunnel({
+      type: "ws_frame",
+      connId: this.connId,
+      data: frameData,
+      binary: isBinary,
+    });
+  }
+
+  close(code: number = 1000, reason: string = ""): void {
+    this._sendToTunnel({
+      type: "ws_close",
+      connId: this.connId,
+      code,
+      reason,
+    });
+  }
+
+  on(event: "message", listener: (data: string | Uint8Array, isBinary: boolean) => void): this;
+  on(event: "close", listener: (code: number, reason: string) => void): this;
+  on(event: "error", listener: (error: Error) => void): this;
+  on(event: "message" | "close" | "error", listener: any): this {
+    if (this._listeners[event]) {
+      this._listeners[event].push(listener);
+    }
+    return this;
+  }
+
+  /** @internal */
+  _emitMessage(data: string | Uint8Array, isBinary: boolean): void {
+    for (const fn of this._listeners.message) {
+      try {
+        fn(data, isBinary);
+      } catch {}
+    }
+  }
+
+  /** @internal */
+  _emitClose(code: number, reason: string): void {
+    for (const fn of this._listeners.close) {
+      try {
+        fn(code, reason);
+      } catch {}
+    }
+  }
+
+  /** @internal */
+  _emitError(err: Error): void {
+    for (const fn of this._listeners.error) {
+      try {
+        fn(err);
+      } catch {}
+    }
+  }
 }
 
 // ============================================================================
@@ -227,6 +386,17 @@ export class TunnelsClient {
       resolveClosed = resolve;
     });
 
+    const activeWsConnections = new Map<
+      string,
+      {
+        type: "virtual" | "socket";
+        virtual?: InProcessWebSocket;
+        socket?: any;
+        close: (code?: number, reason?: string) => void;
+        send: (data: string, binary: boolean) => void;
+      }
+    >();
+
     const session: TunnelSession = {
       publicUrl: tunnel.public_url,
       publicHost: tunnel.public_host,
@@ -236,6 +406,12 @@ export class TunnelsClient {
       },
       async close(): Promise<void> {
         closedExplicitly = true;
+        for (const conn of activeWsConnections.values()) {
+          try {
+            conn.close(1000, "Tunnel closed");
+          } catch {}
+        }
+        activeWsConnections.clear();
         try {
           ws.close(1000, "Client closed connection");
         } catch {}
@@ -269,6 +445,13 @@ export class TunnelsClient {
 
       const onClose = (event: any) => {
         isConnected = false;
+        for (const conn of activeWsConnections.values()) {
+          try {
+            conn.close(1001, "Tunnel disconnected");
+          } catch {}
+        }
+        activeWsConnections.clear();
+
         if (!resolved) {
           resolved = true;
           const code = event?.code || 1006;
@@ -293,15 +476,185 @@ export class TunnelsClient {
       }
     });
 
-    // 3. Setup Incoming HTTP Request Dispatcher
+    // 3. Setup Incoming HTTP & WebSocket Request Dispatcher
     const onMessage = async (event: any) => {
       const rawData = typeof event.data === "string" ? event.data : event.data?.toString?.();
       if (!rawData) return;
 
-      let msg: InboundHttpRequestMessage;
+      let msg: InboundTunnelMessage;
       try {
         msg = JSON.parse(rawData);
       } catch {
+        return;
+      }
+
+      // Handle WebSocket Open request
+      if (msg.type === "ws_open") {
+        if (options.wsHandler) {
+          const virtual = new InProcessWebSocket(
+            msg.connId,
+            msg.path,
+            msg.headers,
+            (toSend) => ws.send(JSON.stringify(toSend))
+          );
+          activeWsConnections.set(msg.connId, {
+            type: "virtual",
+            virtual,
+            close: (code, reason) => virtual.close(code, reason),
+            send: (data, binary) => {
+              if (binary) {
+                virtual._emitMessage(base64ToUint8Array(data), true);
+              } else {
+                virtual._emitMessage(data, false);
+              }
+            },
+          });
+
+          // Confirm connection opened to edge
+          ws.send(JSON.stringify({ type: "ws_opened", connId: msg.connId }));
+
+          Promise.resolve(options.wsHandler(virtual)).catch((err) => {
+            virtual.close(1011, err?.message || "Handler error");
+            activeWsConnections.delete(msg.connId);
+          });
+          return;
+        }
+
+        // Local port / URL forwarding for WebSocket
+        const targetWsUrl =
+          forwardTo.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:") + msg.path;
+        const subprotocol = msg.headers["sec-websocket-protocol"];
+        let protocols: string[] | undefined = undefined;
+        if (subprotocol) {
+          protocols = subprotocol.split(",").map((s) => s.trim());
+        }
+
+        let localWs: any;
+        try {
+          localWs = protocols
+            ? new WSConstructor(targetWsUrl, protocols)
+            : new WSConstructor(targetWsUrl);
+          if ("binaryType" in localWs) {
+            localWs.binaryType = "arraybuffer";
+          }
+        } catch (err: any) {
+          ws.send(
+            JSON.stringify({
+              type: "ws_error",
+              connId: msg.connId,
+              error: err?.message || "Failed to initialize local WebSocket",
+            })
+          );
+          return;
+        }
+
+        const onLocalOpen = () => {
+          ws.send(JSON.stringify({ type: "ws_opened", connId: msg.connId }));
+        };
+
+        const onLocalMessage = async (evt: any) => {
+          let data = evt?.data !== undefined ? evt.data : evt;
+          if (data && typeof data.arrayBuffer === "function") {
+            try {
+              data = await data.arrayBuffer();
+            } catch {}
+          }
+          let frameData: string;
+          let isBinary = false;
+          if (typeof data === "string") {
+            frameData = data;
+            isBinary = false;
+          } else if (data instanceof ArrayBuffer) {
+            frameData = arrayBufferToBase64(data);
+            isBinary = true;
+          } else if (ArrayBuffer.isView(data)) {
+            frameData = arrayBufferToBase64(data);
+            isBinary = true;
+          } else {
+            frameData = String(data);
+          }
+          ws.send(
+            JSON.stringify({
+              type: "ws_frame",
+              connId: msg.connId,
+              data: frameData,
+              binary: isBinary,
+            })
+          );
+        };
+
+        const onLocalClose = (evt: any) => {
+          activeWsConnections.delete(msg.connId);
+          ws.send(
+            JSON.stringify({
+              type: "ws_close",
+              connId: msg.connId,
+              code: evt?.code || 1000,
+              reason: evt?.reason || "",
+            })
+          );
+        };
+
+        const onLocalError = (err: any) => {
+          activeWsConnections.delete(msg.connId);
+          ws.send(
+            JSON.stringify({
+              type: "ws_error",
+              connId: msg.connId,
+              error: err?.message || "Local WebSocket error",
+            })
+          );
+        };
+
+        if (typeof localWs.addEventListener === "function") {
+          localWs.addEventListener("open", onLocalOpen);
+          localWs.addEventListener("message", onLocalMessage);
+          localWs.addEventListener("close", onLocalClose);
+          localWs.addEventListener("error", onLocalError);
+        } else {
+          localWs.onopen = onLocalOpen;
+          localWs.onmessage = onLocalMessage;
+          localWs.onclose = onLocalClose;
+          localWs.onerror = onLocalError;
+        }
+
+        activeWsConnections.set(msg.connId, {
+          type: "socket",
+          socket: localWs,
+          close: (code?: number, reason?: string) => {
+            try {
+              localWs.close(code || 1000, reason || "");
+            } catch {}
+          },
+          send: (data: string, binary: boolean) => {
+            try {
+              if (binary) {
+                localWs.send(base64ToArrayBuffer(data));
+              } else {
+                localWs.send(data);
+              }
+            } catch {}
+          },
+        });
+        return;
+      }
+
+      // Handle WebSocket Frame message
+      if (msg.type === "ws_frame") {
+        const conn = activeWsConnections.get(msg.connId);
+        if (conn) {
+          conn.send(msg.data, !!msg.binary);
+        }
+        return;
+      }
+
+      // Handle WebSocket Close message
+      if (msg.type === "ws_close") {
+        const conn = activeWsConnections.get(msg.connId);
+        if (conn) {
+          conn.close(msg.code, msg.reason);
+          activeWsConnections.delete(msg.connId);
+        }
         return;
       }
 
