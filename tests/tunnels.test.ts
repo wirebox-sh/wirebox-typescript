@@ -252,4 +252,107 @@ describe("Wirebox Tunnels Client", () => {
 
     await session.close();
   });
+
+  it("tunnels.connect() supports in-memory wsHandler for WebSocket upgrades", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        id: "tun_123",
+        organization_id: "org_456",
+        agent_identity_id: "agt_789",
+        agent_handle: "sales-bot",
+        public_url: "https://sales-bot.wirebox.run",
+        public_host: "sales-bot.wirebox.run",
+        status: "active",
+        is_connected: false,
+        connected_clients: 0,
+        connected_at: null,
+        disconnected_at: null,
+        client: null,
+        last_request_at: null,
+        created_at: "2026-09-16T12:00:00Z",
+        updated_at: "2026-09-16T12:00:00Z",
+      }),
+    } as Response);
+
+    let mockWsInstance: any = null;
+    class MockWebSocket {
+      url: string;
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      onclose: (() => void) | null = null;
+      sentMessages: string[] = [];
+
+      constructor(url: string) {
+        this.url = url;
+        mockWsInstance = this;
+        setTimeout(() => {
+          this.onopen?.();
+        }, 10);
+      }
+
+      send(data: string) {
+        this.sentMessages.push(data);
+      }
+
+      close() {
+        this.onclose?.();
+      }
+    }
+
+    const client = new Wirebox({ apiKey: "wb_live_test_key" });
+    const receivedMessages: string[] = [];
+
+    const session = await client.tunnels.connect("sales-bot", {
+      WebSocket: MockWebSocket,
+      wsHandler: async (ws) => {
+        expect(ws.path).toBe("/chat");
+        ws.on("message", (msg) => {
+          receivedMessages.push(String(msg));
+          ws.send(`echo: ${msg}`);
+        });
+      },
+    });
+
+    expect(session.isConnected).toBe(true);
+
+    // Simulate edge sending ws_open
+    mockWsInstance.onmessage?.({
+      data: JSON.stringify({
+        type: "ws_open",
+        connId: "conn_123",
+        path: "/chat",
+        headers: { "sec-websocket-protocol": "chat" },
+      }),
+    });
+
+    // Check that client confirmed ws_opened
+    expect(mockWsInstance.sentMessages).toContain(
+      JSON.stringify({ type: "ws_opened", connId: "conn_123" })
+    );
+
+    // Simulate edge sending ws_frame
+    mockWsInstance.onmessage?.({
+      data: JSON.stringify({
+        type: "ws_frame",
+        connId: "conn_123",
+        data: "hello agent",
+        binary: false,
+      }),
+    });
+
+    expect(receivedMessages).toContain("hello agent");
+    expect(mockWsInstance.sentMessages).toContain(
+      JSON.stringify({
+        type: "ws_frame",
+        connId: "conn_123",
+        data: "echo: hello agent",
+        binary: false,
+      })
+    );
+
+    await session.close();
+  });
 });

@@ -365,6 +365,17 @@ export interface TunnelRequestEvent {
   readonly error?: string;
 }
 
+export interface WireboxWebSocket {
+  readonly connId: string;
+  readonly path: string;
+  readonly headers: Record<string, string>;
+  send(data: string | Uint8Array | ArrayBuffer): void;
+  close(code?: number, reason?: string): void;
+  on(event: "message", listener: (data: string | Uint8Array, isBinary: boolean) => void): this;
+  on(event: "close", listener: (code: number, reason: string) => void): this;
+  on(event: "error", listener: (error: Error) => void): this;
+}
+
 export interface TunnelConnectOptions {
   /**
    * Local port or URL to proxy incoming requests to (e.g. 3000, 8000, "http://localhost:3000", "http://127.0.0.1:8000").
@@ -376,6 +387,12 @@ export interface TunnelConnectOptions {
    * directly in-process without needing a listening TCP port.
    */
   handler?: (req: Request) => Promise<Response> | Response;
+
+  /**
+   * In-memory WebSocket handler. When provided, inbound WebSocket upgrades will be
+   * evaluated directly in-process without needing a listening TCP port.
+   */
+  wsHandler?: (ws: WireboxWebSocket) => Promise<void> | void;
 
   /** Custom client version header */
   clientVersion?: string;
