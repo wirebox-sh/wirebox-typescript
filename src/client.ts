@@ -8,6 +8,7 @@ import { resolveApiKey } from "./credentials.js";
 import { AuthenticationError, NotFoundError } from "./errors.js";
 import { HttpTransport } from "./http.js";
 import { AgentIdentity } from "./identity.js";
+import { TunnelsClient } from "./tunnels.js";
 import type {
   AgentSignupParams,
   AgentSignupResult,
@@ -25,6 +26,7 @@ import type {
 const DEFAULT_BASE_URL = "https://api.wirebox.sh";
 
 export class Wirebox {
+  readonly tunnels: TunnelsClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -41,6 +43,7 @@ export class Wirebox {
       apiKey,
       defaultTimeoutMs: options?.timeoutMs,
     });
+    this.tunnels = new TunnelsClient(this._http, apiKey, baseUrl);
   }
 
   // ==========================================================================

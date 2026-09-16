@@ -8,6 +8,7 @@
 
 export { Wirebox } from "./client.js";
 export { AgentIdentity } from "./identity.js";
+export { TunnelsClient } from "./tunnels.js";
 export { resolveApiKey } from "./credentials.js";
 
 // Errors
@@ -37,9 +38,17 @@ export type {
   CreateIdentityParams,
   UpdateIdentityParams,
   IdentityMailboxSummary,
+  IdentityTunnelSummary,
   IdentityData,
   ListIdentitiesParams,
   ListIdentitiesResult,
+  Tunnel,
+  TunnelClientInfo,
+  ListTunnelsParams,
+  UpdateTunnelParams,
+  TunnelRequestEvent,
+  TunnelConnectOptions,
+  TunnelSession,
   SendEmailAttachment,
   MessageAttachmentSummary,
   SendEmailParams,

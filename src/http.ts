@@ -22,6 +22,14 @@ export class HttpTransport {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 30000;
   }
 
+  get currentBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  get currentApiKey(): string | undefined {
+    return this.apiKey;
+  }
+
   async request<T>(
     method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     path: string,

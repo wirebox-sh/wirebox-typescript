@@ -79,6 +79,13 @@ export interface IdentityMailboxSummary {
   readonly created_at: string;
 }
 
+export interface IdentityTunnelSummary {
+  readonly id: string;
+  readonly public_url: string;
+  readonly status: "active" | "disabled";
+  readonly is_connected: boolean;
+}
+
 export interface IdentityData {
   readonly id: string;
   readonly organization_id: string;
@@ -89,6 +96,8 @@ export interface IdentityData {
   readonly created_at: string;
   readonly updated_at: string;
   readonly mailboxes?: IdentityMailboxSummary[];
+  readonly tunnel?: IdentityTunnelSummary;
+  readonly tunnels?: IdentityTunnelSummary[];
 }
 
 export interface ListIdentitiesParams {
@@ -307,4 +316,89 @@ export interface WhoamiResult {
   readonly organization: WhoamiOrganization;
   readonly auth: WhoamiAuth;
   readonly usage: WhoamiUsage;
+}
+
+// ============================================================================
+// Tunnel Types
+// ============================================================================
+
+export interface TunnelClientInfo {
+  readonly ip: string;
+  readonly version: string;
+  readonly forward_to: string;
+}
+
+export interface Tunnel {
+  readonly id: string;
+  readonly organization_id: string;
+  readonly agent_identity_id: string;
+  readonly agent_handle: string;
+  readonly public_url: string;
+  readonly public_host: string;
+  readonly status: "active" | "disabled";
+  readonly is_connected: boolean;
+  readonly connected_clients: number;
+  readonly connected_at: string | null;
+  readonly disconnected_at: string | null;
+  readonly client: TunnelClientInfo | null;
+  readonly last_request_at: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface ListTunnelsParams {
+  is_connected?: boolean;
+  status?: "active" | "disabled";
+  limit?: number;
+}
+
+export interface UpdateTunnelParams {
+  status: "active" | "disabled";
+}
+
+export interface TunnelRequestEvent {
+  readonly id: string;
+  readonly method: string;
+  readonly path: string;
+  readonly status: number;
+  readonly durationMs: number;
+  readonly error?: string;
+}
+
+export interface TunnelConnectOptions {
+  /**
+   * Local port or URL to proxy incoming requests to (e.g. 3000, 8000, "http://localhost:3000", "http://127.0.0.1:8000").
+   */
+  forwardTo?: string | number;
+
+  /**
+   * In-memory Web Fetch Handler. When provided, inbound requests will be evaluated
+   * directly in-process without needing a listening TCP port.
+   */
+  handler?: (req: Request) => Promise<Response> | Response;
+
+  /** Custom client version header */
+  clientVersion?: string;
+
+  /** Callback triggered when tunnel connection status changes */
+  onStatusChange?: (status: { connected: boolean; error?: string }) => void;
+
+  /** Callback triggered whenever a proxied request finishes */
+  onRequest?: (event: TunnelRequestEvent) => void;
+
+  /** Optional custom WebSocket constructor (for non-standard environments) */
+  WebSocket?: any;
+}
+
+export interface TunnelSession {
+  readonly publicUrl: string;
+  readonly publicHost: string;
+  readonly agentHandle: string;
+  readonly isConnected: boolean;
+
+  /** Closes the active tunnel WebSocket connection cleanly */
+  close(): Promise<void>;
+
+  /** Awaits until the tunnel session has closed (ideal for long-running CLI/daemon processes) */
+  waitClosed(): Promise<void>;
 }

@@ -6,11 +6,13 @@
  */
 
 import type { HttpTransport } from "./http.js";
+import { TunnelsClient } from "./tunnels.js";
 import type {
   DeleteMessageResult,
   EmailMessage,
   IdentityData,
   IdentityMailboxSummary,
+  IdentityTunnelSummary,
   IterMessagesParams,
   ListMessagesParams,
   ListMessagesResult,
@@ -18,6 +20,9 @@ import type {
   ReplyEmailParams,
   SendEmailParams,
   SendEmailResult,
+  Tunnel,
+  TunnelConnectOptions,
+  TunnelSession,
   UpdateIdentityParams,
 } from "./types.js";
 
@@ -31,6 +36,7 @@ export class AgentIdentity {
   readonly created_at: string;
   readonly updated_at: string;
   readonly mailbox: IdentityMailboxSummary;
+  readonly tunnel: IdentityTunnelSummary;
 
   private readonly _http: HttpTransport;
 
@@ -49,6 +55,14 @@ export class AgentIdentity {
       id: "",
       email_address: `${data.agent_handle}@wireboxmail.com`,
       created_at: data.created_at,
+    };
+
+    const primaryTun = data.tunnel || (data.tunnels && data.tunnels.length > 0 ? data.tunnels[0] : undefined);
+    this.tunnel = primaryTun ?? {
+      id: "",
+      public_url: `https://${data.agent_handle}.wirebox.run`,
+      status: "active",
+      is_connected: false,
     };
 
     this._http = http;
@@ -170,5 +184,24 @@ export class AgentIdentity {
     return this._http.delete<DeleteMessageResult>(
       `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/messages/${encodeURIComponent(message_id)}`
     );
+  }
+
+  // ==========================================================================
+  // Core Network Tunnel Methods
+  // ==========================================================================
+
+  /**
+   * Retrieves full details and live status for this agent's network tunnel.
+   */
+  async getTunnel(): Promise<Tunnel> {
+    return this._http.get<Tunnel>(`/v1/identities/${encodeURIComponent(this.agent_handle)}/tunnel`);
+  }
+
+  /**
+   * Connects this agent's tunnel to a local port or in-memory handler.
+   */
+  async connectTunnel(options?: TunnelConnectOptions): Promise<TunnelSession> {
+    const tunnelsClient = new TunnelsClient(this._http, this._http.currentApiKey, this._http.currentBaseUrl);
+    return tunnelsClient.connect(this.agent_handle, options);
   }
 }
