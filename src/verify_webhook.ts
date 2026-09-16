@@ -92,25 +92,48 @@ export async function verifyWebhook(
 
   if (!secret) return false;
 
-  const signatureHeader = getHeader(headers, "x-wirebox-signature") || "";
-  const requestId = getHeader(headers, "x-wirebox-request-id") || "";
-  const timestampStr = getHeader(headers, "x-wirebox-timestamp") || "";
+  let rawSig = getHeader(headers, "x-wirebox-signature") || "";
+  let requestId = getHeader(headers, "x-wirebox-request-id") || "";
+  let timestampStr = getHeader(headers, "x-wirebox-timestamp") || "";
 
-  if (!signatureHeader.startsWith("sha256=")) return false;
-  if (!requestId || !timestampStr) return false;
+  // Support compound format: `t=...,v1=...` or `t=...,req=...,v1=...`
+  if (rawSig.includes("t=") && (rawSig.includes("v1=") || rawSig.includes("sha256="))) {
+    const parts = rawSig.split(",");
+    for (const part of parts) {
+      const trimmed = part.trim();
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const k = trimmed.slice(0, eqIdx);
+        const v = trimmed.slice(eqIdx + 1);
+        if (k === "t" && !timestampStr) timestampStr = v;
+        if (k === "req" && !requestId) requestId = v;
+        if ((k === "v1" || k === "sha256") && !rawSig.startsWith("sha256=")) rawSig = v;
+      }
+    }
+  }
 
-  // 1. Verify timestamp freshness (replay attack prevention)
+  if (!rawSig || !timestampStr) return false;
+
+  const receivedHex = rawSig.startsWith("sha256=")
+    ? rawSig.slice("sha256=".length)
+    : rawSig;
+
+  // 1. Verify timestamp freshness (replay attack prevention, unless toleranceMs is 0)
   const timestampSec = parseInt(timestampStr, 10);
   if (Number.isNaN(timestampSec)) return false;
 
-  const nowMs = Date.now();
-  const eventMs = timestampSec * 1000;
-  if (Math.abs(nowMs - eventMs) > toleranceMs) {
-    return false;
+  if (toleranceMs > 0) {
+    const nowMs = Date.now();
+    const eventMs = timestampSec * 1000;
+    if (Math.abs(nowMs - eventMs) > toleranceMs) {
+      return false;
+    }
   }
 
-  // 2. Reconstruct signature string: `${requestId}.${timestamp}.${rawBody}`
-  const signedString = `${requestId}.${timestampStr}.${rawBody}`;
+  // 2. Reconstruct signature string: `${requestId ? `${requestId}.` : ""}${timestamp}.${rawBody}`
+  const signedString = requestId
+    ? `${requestId}.${timestampStr}.${rawBody}`
+    : `${timestampStr}.${rawBody}`;
 
   // 3. Compute HMAC-SHA256 using Web Crypto
   try {
@@ -134,7 +157,6 @@ export async function verifyWebhook(
     const signatureBuffer = await subtleCrypto.sign("HMAC", key, msgData);
     const hashArray = Array.from(new Uint8Array(signatureBuffer));
     const expectedHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-    const receivedHex = signatureHeader.slice("sha256=".length);
 
     // 4. Constant-time comparison
     return timingSafeEqual(expectedHex, receivedHex);
