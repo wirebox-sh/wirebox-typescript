@@ -7,7 +7,9 @@
 
 import type { HttpTransport } from "./http.js";
 import { TunnelsClient } from "./tunnels.js";
+import { WebhooksClient } from "./webhooks.js";
 import type {
+  CreateWebhookParams,
   DeleteMessageResult,
   EmailMessage,
   IdentityData,
@@ -16,14 +18,18 @@ import type {
   IterMessagesParams,
   ListMessagesParams,
   ListMessagesResult,
+  ListWebhooksParams,
   MessageSummary,
   ReplyEmailParams,
+  RequestOptions,
   SendEmailParams,
   SendEmailResult,
   Tunnel,
   TunnelConnectOptions,
   TunnelSession,
   UpdateIdentityParams,
+  Webhook,
+  WebhookCreateResult,
 } from "./types.js";
 
 export class AgentIdentity {
@@ -203,5 +209,31 @@ export class AgentIdentity {
   async connectTunnel(options?: TunnelConnectOptions): Promise<TunnelSession> {
     const tunnelsClient = new TunnelsClient(this._http, this._http.currentApiKey, this._http.currentBaseUrl);
     return tunnelsClient.connect(this.agent_handle, options);
+  }
+
+  // ==========================================================================
+  // Webhook Subscription Methods
+  // ==========================================================================
+
+  /**
+   * Registers a new webhook subscription scoped specifically to this agent.
+   */
+  async createWebhook(
+    params: Omit<CreateWebhookParams, "agent">,
+    options?: RequestOptions
+  ): Promise<WebhookCreateResult> {
+    const webhooks = new WebhooksClient(this._http);
+    return webhooks.create({ ...params, agent: this.agent_handle }, options);
+  }
+
+  /**
+   * Lists active webhook endpoints associated with this agent.
+   */
+  async listWebhooks(
+    params?: Omit<ListWebhooksParams, "agent">,
+    options?: RequestOptions
+  ): Promise<Webhook[]> {
+    const webhooks = new WebhooksClient(this._http);
+    return webhooks.list({ ...params, agent: this.agent_handle }, options);
   }
 }

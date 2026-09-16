@@ -9,6 +9,7 @@ import { AuthenticationError, NotFoundError } from "./errors.js";
 import { HttpTransport } from "./http.js";
 import { AgentIdentity } from "./identity.js";
 import { TunnelsClient } from "./tunnels.js";
+import { WebhooksClient } from "./webhooks.js";
 import type {
   AgentSignupParams,
   AgentSignupResult,
@@ -27,6 +28,7 @@ const DEFAULT_BASE_URL = "https://api.wirebox.sh";
 
 export class Wirebox {
   readonly tunnels: TunnelsClient;
+  readonly webhooks: WebhooksClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -44,6 +46,7 @@ export class Wirebox {
       defaultTimeoutMs: options?.timeoutMs,
     });
     this.tunnels = new TunnelsClient(this._http, apiKey, baseUrl);
+    this.webhooks = new WebhooksClient(this._http);
   }
 
   // ==========================================================================

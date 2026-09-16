@@ -402,3 +402,95 @@ export interface TunnelSession {
   /** Awaits until the tunnel session has closed (ideal for long-running CLI/daemon processes) */
   waitClosed(): Promise<void>;
 }
+
+// ============================================================================
+// Webhook Types
+// ============================================================================
+
+export type WebhookEventType =
+  | "message.received"
+  | "message.sent"
+  | "message.delivered"
+  | "message.bounced"
+  | "message.failed"
+  | "test.ping"
+  | "*"
+  | string;
+
+export type WebhookStatus = "active" | "paused";
+
+export interface Webhook {
+  readonly id: string;
+  readonly agent_handle: string | null;
+  readonly mailbox_address: string | null;
+  readonly url: string;
+  readonly events: WebhookEventType[];
+  readonly auth_token: string | null;
+  readonly has_auth_token: boolean;
+  readonly status: WebhookStatus;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface WebhookCreateResult extends Webhook {
+  /**
+   * Plaintext HMAC-SHA256 signing secret (whsec_...).
+   * Returned ONLY ONCE upon creation or secret rotation.
+   */
+  readonly secret: string;
+}
+
+export interface CreateWebhookParams {
+  /** Destination HTTPS URL */
+  url: string;
+  /** Non-empty list of event types to subscribe to */
+  events: WebhookEventType[];
+  /** Optional agent handle to scope events (e.g. "sales-bot" or "@sales-bot") */
+  agent?: string;
+  /** Optional mailbox address to scope events */
+  mailbox?: string;
+  /** Optional bearer authorization token */
+  auth_token?: string | null;
+}
+
+export interface UpdateWebhookParams {
+  url?: string;
+  events?: WebhookEventType[];
+  auth_token?: string | null;
+  status?: WebhookStatus;
+}
+
+export interface ListWebhooksParams {
+  mailbox?: string;
+  agent?: string;
+  event?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface WebhookTestResult {
+  readonly webhook_id: string;
+  readonly url: string;
+  readonly event_type: string;
+  readonly status_code: number | null;
+  readonly latency_ms: number;
+  readonly success: boolean;
+  readonly error: string | null;
+}
+
+export interface WebhookRotateSecretResult {
+  readonly id: string;
+  readonly secret: string;
+  readonly updated_at: string;
+}
+
+export interface VerifyWebhookOptions {
+  /** Raw payload body as string, Buffer, or Uint8Array */
+  payload: string | Uint8Array;
+  /** Request headers object or Headers instance */
+  headers: Record<string, string | string[] | undefined> | Headers;
+  /** Signing secret ('whsec_...') */
+  secret: string;
+  /** Allowed clock skew in milliseconds (default 300,000 ms / 5 minutes) */
+  toleranceMs?: number;
+}

@@ -9,6 +9,8 @@
 export { Wirebox } from "./client.js";
 export { AgentIdentity } from "./identity.js";
 export { TunnelsClient } from "./tunnels.js";
+export { WebhooksClient } from "./webhooks.js";
+export { verifyWebhook } from "./verify_webhook.js";
 export { resolveApiKey } from "./credentials.js";
 
 // Errors
@@ -68,4 +70,14 @@ export type {
   WhoamiAuth,
   WhoamiUsage,
   WhoamiResult,
+  WebhookEventType,
+  WebhookStatus,
+  Webhook,
+  WebhookCreateResult,
+  CreateWebhookParams,
+  UpdateWebhookParams,
+  ListWebhooksParams,
+  WebhookTestResult,
+  WebhookRotateSecretResult,
+  VerifyWebhookOptions,
 } from "./types.js";
