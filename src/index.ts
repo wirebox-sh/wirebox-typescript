@@ -8,6 +8,7 @@
 
 export { Wirebox } from "./client.js";
 export { AgentIdentity } from "./identity.js";
+export { ImessageClient } from "./imessage.js";
 export { TunnelsClient } from "./tunnels.js";
 export { WebhooksClient } from "./webhooks.js";
 export { verifyWebhook } from "./verify_webhook.js";
@@ -80,4 +81,19 @@ export type {
   WebhookTestResult,
   WebhookRotateSecretResult,
   VerifyWebhookOptions,
+  ImessageRouterInfo,
+  GetImessageRouterParams,
+  ImessageConversationLastMessage,
+  ImessageConversation,
+  ListImessageConversationsParams,
+  ListImessageConversationsResult,
+  DisconnectImessageConversationResult,
+  ImessageMessage,
+  ListImessageMessagesParams,
+  ListImessageMessagesResult,
+  SendImessageParams,
+  SendImessageResult,
+  ImessageUser,
+  ListImessageUsersResult,
+  DeleteImessageUserResult,
 } from "./types.js";

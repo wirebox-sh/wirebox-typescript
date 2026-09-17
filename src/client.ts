@@ -8,6 +8,7 @@ import { resolveApiKey } from "./credentials.js";
 import { AuthenticationError, NotFoundError } from "./errors.js";
 import { HttpTransport } from "./http.js";
 import { AgentIdentity } from "./identity.js";
+import { ImessageClient } from "./imessage.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
 import type {
@@ -29,6 +30,7 @@ const DEFAULT_BASE_URL = "https://api.wirebox.sh";
 export class Wirebox {
   readonly tunnels: TunnelsClient;
   readonly webhooks: WebhooksClient;
+  readonly imessage: ImessageClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -47,6 +49,7 @@ export class Wirebox {
     });
     this.tunnels = new TunnelsClient(this._http, apiKey, baseUrl);
     this.webhooks = new WebhooksClient(this._http);
+    this.imessage = new ImessageClient(this._http);
   }
 
   // ==========================================================================

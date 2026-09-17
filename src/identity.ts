@@ -6,16 +6,22 @@
  */
 
 import type { HttpTransport } from "./http.js";
+import { ImessageClient } from "./imessage.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
 import type {
   CreateWebhookParams,
   DeleteMessageResult,
+  DisconnectImessageConversationResult,
   EmailMessage,
   IdentityData,
   IdentityMailboxSummary,
   IdentityTunnelSummary,
+  ImessageMessage,
+  ImessageRouterInfo,
   IterMessagesParams,
+  ListImessageConversationsResult,
+  ListImessageMessagesResult,
   ListMessagesParams,
   ListMessagesResult,
   ListWebhooksParams,
@@ -24,6 +30,7 @@ import type {
   RequestOptions,
   SendEmailParams,
   SendEmailResult,
+  SendImessageResult,
   Tunnel,
   TunnelConnectOptions,
   TunnelSession,
@@ -235,5 +242,145 @@ export class AgentIdentity {
   ): Promise<Webhook[]> {
     const webhooks = new WebhooksClient(this._http);
     return webhooks.list({ ...params, agent: this.agent_handle }, options);
+  }
+
+  // ==========================================================================
+  // Core iMessage Methods
+  // ==========================================================================
+
+  /**
+   * Retrieves this agent's iMessage router info, connect command, and QR code URI.
+   *
+   * @param userPhone Optional user phone number to check router line mapping.
+   * @param options Optional custom request options.
+   */
+  async getImessageRouter(
+    userPhone?: string,
+    options?: RequestOptions
+  ): Promise<ImessageRouterInfo> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.getRouter(
+      { agent: this.agent_handle, user_phone: userPhone },
+      options
+    );
+  }
+
+  /**
+   * Sends an outbound iMessage from this agent identity.
+   *
+   * @param params Message parameters (to or conversation_id, text, and/or media_url).
+   * @param options Optional custom request options.
+   */
+  async sendImessage(
+    params: {
+      conversation_id?: string;
+      to?: string;
+      text?: string;
+      media_url?: string;
+    },
+    options?: RequestOptions
+  ): Promise<SendImessageResult> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.messages.send(
+      {
+        ...params,
+        identity_id: this.id,
+      },
+      options
+    );
+  }
+
+  /**
+   * Lists iMessage conversations owned by this agent identity.
+   *
+   * @param params Optional filters (status, limit, cursor).
+   * @param options Optional custom request options.
+   */
+  async listImessageConversations(
+    params?: {
+      status?: "connected" | "disconnected";
+      limit?: number;
+      cursor?: string;
+    },
+    options?: RequestOptions
+  ): Promise<ListImessageConversationsResult> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.conversations.list(
+      {
+        ...params,
+        identity_id: this.id,
+      },
+      options
+    );
+  }
+
+  /**
+   * Lists message history within a specific conversation.
+   *
+   * @param conversationId The conversation ID.
+   * @param params Optional limit and cursor.
+   * @param options Optional custom request options.
+   */
+  async listImessageMessages(
+    conversationId: string,
+    params?: { limit?: number; cursor?: string },
+    options?: RequestOptions
+  ): Promise<ListImessageMessagesResult> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.messages.list(
+      {
+        conversation_id: conversationId,
+        limit: params?.limit,
+        cursor: params?.cursor,
+      },
+      options
+    );
+  }
+
+  /**
+   * Auto-paginating async generator yielding messages chronologically across an iMessage conversation.
+   *
+   * @example
+   * for await (const msg of agent.iterImessageMessages(convId)) {
+   *   console.log(msg.sender, msg.text);
+   * }
+   */
+  async *iterImessageMessages(
+    conversationId: string,
+    options?: { limit?: number }
+  ): AsyncGenerator<ImessageMessage, void, unknown> {
+    const limit = options?.limit ?? 50;
+    let cursor: string | undefined = undefined;
+
+    while (true) {
+      const page = await this.listImessageMessages(conversationId, { limit, cursor });
+      if (!page.data || page.data.length === 0) {
+        break;
+      }
+
+      for (const message of page.data) {
+        yield message;
+      }
+
+      if (!page.has_more || !page.next_cursor) {
+        break;
+      }
+
+      cursor = page.next_cursor;
+    }
+  }
+
+  /**
+   * Disconnects an active conversation session.
+   *
+   * @param conversationId The conversation ID.
+   * @param options Optional custom request options.
+   */
+  async disconnectImessageConversation(
+    conversationId: string,
+    options?: RequestOptions
+  ): Promise<DisconnectImessageConversationResult> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.conversations.disconnect(conversationId, options);
   }
 }
