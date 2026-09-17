@@ -430,6 +430,12 @@ export type WebhookEventType =
   | "message.delivered"
   | "message.bounced"
   | "message.failed"
+  | "imessage.connected"
+  | "imessage.disconnected"
+  | "imessage.received"
+  | "imessage.sent"
+  | "imessage.delivered"
+  | "imessage.failed"
   | "test.ping"
   | "*"
   | string;
@@ -511,3 +517,118 @@ export interface VerifyWebhookOptions {
   /** Allowed clock skew in milliseconds (default 300,000 ms / 5 minutes) */
   toleranceMs?: number;
 }
+
+// ============================================================================
+// iMessage Types
+// ============================================================================
+
+export interface ImessageRouterInfo {
+  readonly router_number: string;
+  readonly agent_handle: string;
+  readonly connect_command: string;
+  readonly qr_uri: string;
+  readonly status: "online" | "offline" | string;
+}
+
+export interface GetImessageRouterParams {
+  /** Optional agent handle or identity ID to resolve dedicated connect command */
+  agent?: string;
+  /** Optional caller's phone number to check assigned router line */
+  user_phone?: string;
+}
+
+export interface ImessageConversationLastMessage {
+  readonly id: string;
+  readonly direction: "inbound" | "outbound";
+  readonly text: string | null;
+  readonly has_media: boolean;
+  readonly created_at: string;
+}
+
+export interface ImessageConversation {
+  readonly id: string;
+  readonly identity_id: string;
+  readonly user_phone: string;
+  readonly status: "connected" | "disconnected";
+  readonly unread_count: number;
+  readonly last_message: ImessageConversationLastMessage | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface ListImessageConversationsParams {
+  /** Filter conversations by agent identity ID */
+  identity_id?: string;
+  /** Filter by session status */
+  status?: "connected" | "disconnected";
+  /** Maximum number of conversations to return (1-100, default: 20) */
+  limit?: number;
+  /** Cursor for pagination */
+  cursor?: string;
+}
+
+export interface ListImessageConversationsResult {
+  readonly data: ImessageConversation[];
+  readonly next_cursor: string | null;
+  readonly has_more: boolean;
+}
+
+export interface DisconnectImessageConversationResult {
+  readonly id: string;
+  readonly status: "disconnected";
+  readonly disconnected_at: string;
+}
+
+export interface ImessageMessage {
+  readonly id: string;
+  readonly conversation_id: string;
+  readonly identity_id: string;
+  readonly direction: "inbound" | "outbound";
+  readonly sender: string;
+  readonly text: string | null;
+  readonly media_url: string | null;
+  readonly is_read: boolean;
+  readonly created_at: string;
+}
+
+export interface ListImessageMessagesParams {
+  /** The conversation ID whose messages are retrieved */
+  conversation_id: string;
+  /** Maximum number of messages to return (1-100, default: 50) */
+  limit?: number;
+  /** Cursor for pagination */
+  cursor?: string;
+}
+
+export interface ListImessageMessagesResult {
+  readonly data: ImessageMessage[];
+  readonly next_cursor: string | null;
+  readonly has_more: boolean;
+}
+
+export interface SendImessageParams {
+  /** Existing conversation ID to reply into (mutually exclusive with 'to') */
+  conversation_id?: string;
+  /** Recipient E.164 phone number (mutually exclusive with 'conversation_id') */
+  to?: string;
+  /** Text body of the message */
+  text?: string;
+  /** Public HTTPS URL of the media attachment to send */
+  media_url?: string;
+  /** Target agent identity ID (required when using Organization Admin key, optional when identity-scoped) */
+  identity_id?: string;
+}
+
+export interface SendImessageResult {
+  readonly id: string;
+  readonly conversation_id: string;
+  readonly identity_id: string;
+  readonly direction: "outbound";
+  readonly to: string;
+  readonly text: string | null;
+  readonly media_url: string | null;
+  readonly status: "sent";
+  readonly created_at: string;
+}
+
+

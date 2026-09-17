@@ -1,6 +1,6 @@
 {
   "name": "@wirebox-sh/sdk",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Official TypeScript SDK for Wirebox — Real-world identity and communication layer for AI agents",
   "license": "MIT",
   "publishConfig": {
