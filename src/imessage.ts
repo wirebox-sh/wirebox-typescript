@@ -8,17 +8,14 @@
 
 import type { HttpTransport } from "./http.js";
 import type {
-  DeleteImessageUserResult,
   DisconnectImessageConversationResult,
   GetImessageRouterParams,
   ImessageConversation,
   ImessageRouterInfo,
-  ImessageUser,
   ListImessageConversationsParams,
   ListImessageConversationsResult,
   ListImessageMessagesParams,
   ListImessageMessagesResult,
-  ListImessageUsersResult,
   RequestOptions,
   SendImessageParams,
   SendImessageResult,
@@ -140,42 +137,6 @@ export class ImessageClient {
       if (params.identity_id) body.identity_id = params.identity_id;
 
       return this.http.post<SendImessageResult>("/v1/imessage/messages", body, options);
-    },
-  };
-
-  /**
-   * Operations on iMessage gateway user allowlist and auto-provisioning.
-   */
-  readonly users = {
-    /**
-     * Lists registered user phone numbers on the iMessage gateway.
-     */
-    list: async (options?: RequestOptions): Promise<ListImessageUsersResult> => {
-      return this.http.get<ListImessageUsersResult>("/v1/imessage/users", undefined, options);
-    },
-
-    /**
-     * Registers a user phone number on the gateway.
-     */
-    add: async (phoneNumber: string, options?: RequestOptions): Promise<ImessageUser> => {
-      return this.http.post<ImessageUser>(
-        "/v1/imessage/users",
-        { phone_number: phoneNumber },
-        options
-      );
-    },
-
-    /**
-     * Removes a user phone number from the gateway.
-     */
-    remove: async (
-      phoneNumber: string,
-      options?: RequestOptions
-    ): Promise<DeleteImessageUserResult> => {
-      return this.http.delete<DeleteImessageUserResult>(
-        `/v1/imessage/users/${encodeURIComponent(phoneNumber)}`,
-        options
-      );
     },
   };
 }

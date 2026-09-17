@@ -212,47 +212,6 @@ describe("iMessage Client & Agent Integration", () => {
     expect(res.data[0]?.text).toBe("Hello");
   });
 
-  it("wirebox.imessage.users manages allowlist (list, add, remove)", async () => {
-    const fetchListSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: async () => ({
-        data: [{ phone_number: "+16465550123", assigned_router_number: "+16282649335" }],
-        total: 1,
-      }),
-    } as Response);
-
-    const client = new Wirebox({ apiKey: "wb_live_test_key" });
-    const listRes = await client.imessage.users.list();
-    expect(listRes.total).toBe(1);
-    expect(listRes.data[0]?.phone_number).toBe("+16465550123");
-
-    const fetchAddSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      status: 201,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: async () => ({
-        phone_number: "+16465559999",
-        assigned_router_number: "+16282649335",
-        status: "active",
-      }),
-    } as Response);
-
-    const addRes = await client.imessage.users.add("+16465559999");
-    expect(addRes.phone_number).toBe("+16465559999");
-
-    const fetchDeleteSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: async () => ({ status: "deleted", phone_number: "+16465559999" }),
-    } as Response);
-
-    const delRes = await client.imessage.users.remove("+16465559999");
-    expect(delRes.status).toBe("deleted");
-    expect(delRes.phone_number).toBe("+16465559999");
-  });
 
   it("AgentIdentity direct methods scope calls to agent identity", async () => {
     const http = new HttpTransport({ baseUrl: "https://api.wirebox.sh", apiKey: "wb_live_test_key" });

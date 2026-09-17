@@ -93,7 +93,4 @@ export type {
   ListImessageMessagesResult,
   SendImessageParams,
   SendImessageResult,
-  ImessageUser,
-  ListImessageUsersResult,
-  DeleteImessageUserResult,
 } from "./types.js";

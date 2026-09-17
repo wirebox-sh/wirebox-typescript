@@ -432,6 +432,8 @@ export type WebhookEventType =
   | "message.failed"
   | "imessage.received"
   | "imessage.sent"
+  | "imessage.delivered"
+  | "imessage.failed"
   | "test.ping"
   | "*"
   | string;
@@ -627,21 +629,4 @@ export interface SendImessageResult {
   readonly created_at: string;
 }
 
-export interface ImessageUser {
-  readonly id?: string;
-  readonly phone_number: string;
-  readonly assigned_router_number?: string;
-  readonly status?: string;
-  readonly created_at?: string;
-}
-
-export interface ListImessageUsersResult {
-  readonly data: ImessageUser[];
-  readonly total: number;
-}
-
-export interface DeleteImessageUserResult {
-  readonly status: "deleted";
-  readonly phone_number: string;
-}
 
