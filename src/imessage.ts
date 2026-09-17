@@ -1,7 +1,7 @@
 /**
  * Wirebox TypeScript SDK - iMessage Client
  *
- * Real-world Apple iMessage communication channel for autonomous AI agents.
+ * Real-world iMessage communication channel for autonomous AI agents.
  * Supports zero-setup QR scan & connect commands, stateful conversations,
  * and high-speed edge message delivery.
  */
