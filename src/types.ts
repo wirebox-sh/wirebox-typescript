@@ -425,17 +425,25 @@ export interface TunnelSession {
 // ============================================================================
 
 export type WebhookEventType =
-  | "message.received"
-  | "message.sent"
-  | "message.delivered"
-  | "message.bounced"
-  | "message.failed"
+  // Email Events
+  | "email.received"
+  | "email.sent"
+  | "email.delivered"
+  | "email.bounced"
+  | "email.failed"
+  // SMS Events
+  | "sms.received"
+  | "sms.sent"
+  | "sms.delivered"
+  | "sms.failed"
+  // iMessage Events
   | "imessage.connected"
   | "imessage.disconnected"
   | "imessage.received"
   | "imessage.sent"
   | "imessage.delivered"
   | "imessage.failed"
+  // System Events
   | "test.ping"
   | "*"
   | string;
@@ -629,6 +637,98 @@ export interface SendImessageResult {
   readonly media_url: string | null;
   readonly status: "sent";
   readonly created_at: string;
+}
+
+// ============================================================================
+// Phone & SMS Types
+// ============================================================================
+
+export interface PhoneNumberCapabilities {
+  readonly sms: boolean;
+  readonly mms: boolean;
+  readonly voice: boolean;
+}
+
+export interface PhoneNumber {
+  readonly id: string;
+  readonly phone_number: string;
+  readonly country_code: string;
+  readonly type: "local" | "toll_free" | string;
+  readonly region: string | null;
+  readonly agent_handle: string;
+  readonly agent_identity_id: string;
+  readonly status: "active" | "released" | string;
+  readonly sms_status: "ready" | "pending" | "assignment_failed" | string;
+  readonly sms_error_code: string | null;
+  readonly sms_error_detail: string | null;
+  readonly sms_ready_at: string | null;
+  readonly capabilities: PhoneNumberCapabilities;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface ProvisionPhoneNumberParams {
+  /** Target agent handle (required for top-level client; automatically injected on AgentIdentity) */
+  agent_handle: string;
+  /** Country code: "US" or "CA" (defaults to "US") */
+  country_code?: "US" | "CA";
+  /** Type of phone number: "local" or "toll_free" (defaults to "local") */
+  type?: "local" | "toll_free";
+  /** Two-letter US state or CA province code (e.g. "CA", "NY"). Mutually exclusive with area_code. */
+  region?: string;
+  /** 3-digit area code (e.g. "415", "212"). Mutually exclusive with region. */
+  area_code?: string;
+}
+
+export interface ListPhoneNumbersParams {
+  limit?: number;
+  cursor?: string;
+  status?: "active" | "released" | string;
+  sms_status?: "ready" | "pending" | "assignment_failed" | string;
+}
+
+export interface ListPhoneNumbersResult {
+  readonly numbers: PhoneNumber[];
+  readonly next_cursor: string | null;
+  readonly has_more: boolean;
+}
+
+export interface PhoneMediaItem {
+  readonly content_type: string;
+  readonly size_bytes: number;
+  readonly url: string | null;
+}
+
+export interface PhoneMessage {
+  readonly id: string;
+  readonly phone_number: string;
+  readonly agent_handle: string;
+  readonly direction: "inbound" | "outbound" | string;
+  readonly type: "sms" | "mms" | string;
+  readonly from_number: string;
+  readonly to_numbers: string[];
+  readonly text: string;
+  readonly media: PhoneMediaItem[] | null;
+  readonly is_read: boolean;
+  readonly segments: number;
+  readonly created_at: string;
+}
+
+export interface ListPhoneMessagesParams {
+  limit?: number;
+  cursor?: string;
+  is_read?: boolean;
+  from_number?: string;
+}
+
+export interface ListPhoneMessagesResult {
+  readonly messages: PhoneMessage[];
+  readonly next_cursor: string | null;
+  readonly has_more: boolean;
+}
+
+export interface UpdatePhoneMessageParams {
+  is_read: boolean;
 }
 
 
