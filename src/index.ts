@@ -9,6 +9,7 @@
 export { Wirebox } from "./client.js";
 export { AgentIdentity } from "./identity.js";
 export { ImessageClient } from "./imessage.js";
+export { PhoneClient, PhoneNumbersClient, PhoneMessagesClient } from "./phone.js";
 export { TunnelsClient } from "./tunnels.js";
 export { WebhooksClient } from "./webhooks.js";
 export { verifyWebhook } from "./verify_webhook.js";
@@ -93,4 +94,14 @@ export type {
   ListImessageMessagesResult,
   SendImessageParams,
   SendImessageResult,
+  PhoneNumberCapabilities,
+  PhoneNumber,
+  ProvisionPhoneNumberParams,
+  ListPhoneNumbersParams,
+  ListPhoneNumbersResult,
+  PhoneMediaItem,
+  PhoneMessage,
+  ListPhoneMessagesParams,
+  ListPhoneMessagesResult,
+  UpdatePhoneMessageParams,
 } from "./types.js";

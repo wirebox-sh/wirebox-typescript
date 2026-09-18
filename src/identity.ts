@@ -7,6 +7,7 @@
 
 import type { HttpTransport } from "./http.js";
 import { ImessageClient } from "./imessage.js";
+import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
 import type {
@@ -24,8 +25,13 @@ import type {
   ListImessageMessagesResult,
   ListMessagesParams,
   ListMessagesResult,
+  ListPhoneMessagesParams,
+  ListPhoneMessagesResult,
   ListWebhooksParams,
   MessageSummary,
+  PhoneMessage,
+  PhoneNumber,
+  ProvisionPhoneNumberParams,
   ReplyEmailParams,
   RequestOptions,
   SendEmailParams,
@@ -383,4 +389,86 @@ export class AgentIdentity {
     const imessage = new ImessageClient(this._http);
     return imessage.conversations.disconnect(conversationId, options);
   }
+
+  // ==========================================================================
+  // Phone & SMS Communication Methods
+  // ==========================================================================
+
+  /**
+   * Provisions a carrier phone number for this agent identity.
+   *
+   * @param params Optional geographic parameters (region / area code).
+   * @param options Optional custom request options.
+   */
+  async provisionPhoneNumber(
+    params?: Omit<ProvisionPhoneNumberParams, "agent_handle">,
+    options?: RequestOptions
+  ): Promise<PhoneNumber> {
+    const phone = new PhoneClient(this._http);
+    return phone.numbers.provision(
+      {
+        agent_handle: this.agent_handle,
+        ...params,
+      },
+      options
+    );
+  }
+
+  /**
+   * Retrieves this agent identity's phone number details.
+   *
+   * @param options Optional custom request options.
+   */
+  async getPhoneNumber(options?: RequestOptions): Promise<PhoneNumber> {
+    const phone = new PhoneClient(this._http);
+    return phone.numbers.get(this.agent_handle, options);
+  }
+
+  /**
+   * Releases this agent identity's phone number back to the carrier.
+   *
+   * @param options Optional custom request options.
+   */
+  async releasePhoneNumber(options?: RequestOptions): Promise<void> {
+    const phone = new PhoneClient(this._http);
+    return phone.numbers.release(this.agent_handle, options);
+  }
+
+  /**
+   * Scoped phone and SMS operations for this agent identity.
+   */
+  readonly phone = {
+    /**
+     * Lists SMS/MMS messages received by this agent identity, newest first.
+     */
+    listMessages: async (
+      params?: ListPhoneMessagesParams,
+      options?: RequestOptions
+    ): Promise<ListPhoneMessagesResult> => {
+      const phone = new PhoneClient(this._http);
+      return phone.messages.list(this.agent_handle, params, options);
+    },
+
+    /**
+     * Retrieves a single SMS/MMS message received by this agent.
+     */
+    getMessage: async (
+      messageId: string,
+      options?: RequestOptions
+    ): Promise<PhoneMessage> => {
+      const phone = new PhoneClient(this._http);
+      return phone.messages.get(this.agent_handle, messageId, options);
+    },
+
+    /**
+     * Marks an SMS/MMS message as read.
+     */
+    markMessageRead: async (
+      messageId: string,
+      options?: RequestOptions
+    ): Promise<PhoneMessage> => {
+      const phone = new PhoneClient(this._http);
+      return phone.messages.markRead(this.agent_handle, messageId, options);
+    },
+  };
 }
