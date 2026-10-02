@@ -16,6 +16,7 @@ import type {
   ListImessageConversationsResult,
   ListImessageMessagesParams,
   ListImessageMessagesResult,
+  MarkImessageConversationReadResult,
   RequestOptions,
   SendImessageParams,
   SendImessageResult,
@@ -96,6 +97,30 @@ export class ImessageClient {
         options
       );
     },
+
+    /**
+     * Marks every inbound message in the conversation as read and resets unread count.
+     */
+    read: async (
+      conversationId: string,
+      options?: RequestOptions
+    ): Promise<MarkImessageConversationReadResult> => {
+      return this.http.post<MarkImessageConversationReadResult>(
+        `/v1/imessage/conversations/${encodeURIComponent(conversationId)}/read`,
+        {},
+        options
+      );
+    },
+
+    /**
+     * Alias for read(conversationId).
+     */
+    markRead: async (
+      conversationId: string,
+      options?: RequestOptions
+    ): Promise<MarkImessageConversationReadResult> => {
+      return this.conversations.read(conversationId, options);
+    },
   };
 
   /**
@@ -109,11 +134,12 @@ export class ImessageClient {
       params: ListImessageMessagesParams,
       options?: RequestOptions
     ): Promise<ListImessageMessagesResult> => {
-      const query: Record<string, string | number | undefined> = {
+      const query: Record<string, string | number | boolean | undefined> = {
         conversation_id: params.conversation_id,
       };
       if (params.limit !== undefined) query.limit = params.limit;
       if (params.cursor) query.cursor = params.cursor;
+      if (params.mark_read !== undefined) query.mark_read = params.mark_read;
 
       return this.http.get<ListImessageMessagesResult>(
         "/v1/imessage/messages",
