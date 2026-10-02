@@ -28,6 +28,7 @@ import type {
   ListPhoneMessagesParams,
   ListPhoneMessagesResult,
   ListWebhooksParams,
+  MarkImessageConversationReadResult,
   MessageSummary,
   PhoneMessage,
   PhoneNumber,
@@ -388,6 +389,20 @@ export class AgentIdentity {
   ): Promise<DisconnectImessageConversationResult> {
     const imessage = new ImessageClient(this._http);
     return imessage.conversations.disconnect(conversationId, options);
+  }
+
+  /**
+   * Marks every inbound message in an iMessage conversation as read and resets unread count.
+   *
+   * @param conversationId The conversation ID.
+   * @param options Optional custom request options.
+   */
+  async markImessageConversationRead(
+    conversationId: string,
+    options?: RequestOptions
+  ): Promise<MarkImessageConversationReadResult> {
+    const imessage = new ImessageClient(this._http);
+    return imessage.conversations.read(conversationId, options);
   }
 
   // ==========================================================================

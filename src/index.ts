@@ -89,6 +89,7 @@ export type {
   ListImessageConversationsParams,
   ListImessageConversationsResult,
   DisconnectImessageConversationResult,
+  MarkImessageConversationReadResult,
   ImessageMessage,
   ListImessageMessagesParams,
   ListImessageMessagesResult,

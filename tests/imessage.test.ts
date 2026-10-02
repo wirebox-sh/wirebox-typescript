@@ -291,6 +291,110 @@ describe("iMessage Client & Agent Integration", () => {
 
     const disc = await agent.disconnectImessageConversation("conv_01j999888777");
     expect(disc.status).toBe("disconnected");
+
+    // 5. markImessageConversationRead
+    const fetchSpy5 = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ id: "conv_01j999888777", unread_count: 0 }),
+    } as Response);
+
+    const readRes = await agent.markImessageConversationRead("conv_01j999888777");
+    expect(readRes.id).toBe("conv_01j999888777");
+    expect(readRes.unread_count).toBe(0);
+    expect(fetchSpy5).toHaveBeenCalledWith(
+      "https://api.wirebox.sh/v1/imessage/conversations/conv_01j999888777/read",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("wirebox.imessage.conversations.read() and markRead() reset unread count", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ id: "conv_01j999888777", unread_count: 0 }),
+    } as Response);
+
+    const client = new Wirebox({ apiKey: "wb_live_test_key" });
+    const res1 = await client.imessage.conversations.read("conv_01j999888777");
+    expect(res1.unread_count).toBe(0);
+
+    const res2 = await client.imessage.conversations.markRead("conv_01j999888777");
+    expect(res2.unread_count).toBe(0);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.wirebox.sh/v1/imessage/conversations/conv_01j999888777/read",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("wirebox.imessage.messages.list() passes mark_read=false when provided", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        data: [
+          {
+            id: "msg_unread_1",
+            conversation_id: "conv_01j999888777",
+            identity_id: "agt_123",
+            direction: "inbound",
+            sender: "+16465550123",
+            text: "Unread message",
+            media_url: null,
+            status: "received",
+            error_message: null,
+            is_read: false,
+            created_at: "2026-09-17T02:00:00Z",
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    } as Response);
+
+    const client = new Wirebox({ apiKey: "wb_live_test_key" });
+    const res = await client.imessage.messages.list({
+      conversation_id: "conv_01j999888777",
+      mark_read: false,
+    });
+
+    expect(res.data[0]!.is_read).toBe(false);
+    expect(res.data[0]!.status).toBe("received");
+    const calledUrl = new URL(fetchSpy.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("mark_read")).toBe("false");
+  });
+
+  it("wirebox.imessage.messages.send() handles delivery failure status and error detail", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        id: "msg_failed_001",
+        conversation_id: "conv_01j999888777",
+        identity_id: "agt_123",
+        direction: "outbound",
+        to: "+16465550123",
+        text: "Failed attempt",
+        media_url: null,
+        status: "failed",
+        error_message: "Photon bridge unreachable",
+        created_at: "2026-09-17T02:05:00Z",
+      }),
+    } as Response);
+
+    const client = new Wirebox({ apiKey: "wb_live_test_key" });
+    const res = await client.imessage.messages.send({
+      conversation_id: "conv_01j999888777",
+      text: "Failed attempt",
+    });
+
+    expect(res.status).toBe("failed");
+    expect(res.error_message).toBe("Photon bridge unreachable");
   });
 
   it("agent.iterImessageMessages() streams auto-paginated messages across pages", async () => {

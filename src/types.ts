@@ -587,6 +587,11 @@ export interface DisconnectImessageConversationResult {
   readonly disconnected_at: string;
 }
 
+export interface MarkImessageConversationReadResult {
+  readonly id: string;
+  readonly unread_count: number;
+}
+
 export interface ImessageMessage {
   readonly id: string;
   readonly conversation_id: string;
@@ -595,6 +600,8 @@ export interface ImessageMessage {
   readonly sender: string;
   readonly text: string | null;
   readonly media_url: string | null;
+  readonly status?: "received" | "pending" | "sent" | "delivered" | "failed" | string;
+  readonly error_message?: string | null;
   readonly is_read: boolean;
   readonly created_at: string;
 }
@@ -606,6 +613,8 @@ export interface ListImessageMessagesParams {
   limit?: number;
   /** Cursor for pagination */
   cursor?: string;
+  /** When false, returns messages without marking inbound items as read and leaves conversation unread count untouched. Defaults to true. */
+  mark_read?: boolean;
 }
 
 export interface ListImessageMessagesResult {
@@ -635,7 +644,8 @@ export interface SendImessageResult {
   readonly to: string;
   readonly text: string | null;
   readonly media_url: string | null;
-  readonly status: "sent";
+  readonly status: "sent" | "failed";
+  readonly error_message?: string | null;
   readonly created_at: string;
 }
 
