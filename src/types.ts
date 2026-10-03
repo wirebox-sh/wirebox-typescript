@@ -176,10 +176,12 @@ export interface SendEmailParams {
 }
 
 export interface SendEmailResult {
-  readonly message_id: string;
-  readonly mailbox_address: string;
-  readonly status: "queued" | "sent";
-  readonly created_at: string;
+  readonly id: string;
+  readonly thread_id?: string;
+  readonly message_id?: string;
+  readonly mailbox_address?: string;
+  readonly status?: "queued" | "sent";
+  readonly created_at?: string;
 }
 
 export interface ListMessagesParams {
@@ -190,19 +192,27 @@ export interface ListMessagesParams {
 
 export interface MessageSummary {
   readonly id: string;
+  readonly thread_id?: string;
   readonly direction: "inbound" | "outbound";
   readonly subject: string;
-  readonly from_address: string;
-  readonly to_addresses: string[];
+  readonly from?: string;
+  readonly from_address?: string;
+  readonly to?: string[];
+  readonly to_addresses?: string[];
   readonly cc_addresses?: string[];
-  readonly status: "queued" | "sent" | "delivered" | "bounced" | "failed";
+  readonly is_read?: boolean;
+  readonly is_starred?: boolean;
+  readonly has_attachments?: boolean;
+  readonly status?: "queued" | "sent" | "delivered" | "bounced" | "failed" | string;
   readonly created_at: string;
   readonly snippet?: string;
 }
 
 export interface ListMessagesResult {
   readonly messages: MessageSummary[];
-  readonly total: number;
+  readonly total?: number;
+  readonly next_cursor?: string | null;
+  readonly has_more?: boolean;
 }
 
 export interface IterMessagesParams {
@@ -216,18 +226,26 @@ export interface IterMessagesParams {
 export interface EmailMessage {
   readonly id: string;
   readonly mailbox_id: string;
+  readonly thread_id?: string;
   readonly direction: "inbound" | "outbound";
-  readonly from_address: string;
-  readonly to_addresses: string[];
-  readonly cc_addresses: string[];
-  readonly bcc_addresses: string[];
-  readonly reply_to: string | null;
+  readonly from?: string;
+  readonly from_address?: string;
+  readonly to?: string[];
+  readonly to_addresses?: string[];
+  readonly cc?: string[];
+  readonly cc_addresses?: string[];
+  readonly bcc?: string[];
+  readonly bcc_addresses?: string[];
+  readonly reply_to?: string | null;
   readonly subject: string;
   readonly text: string | null;
   readonly html: string | null;
+  readonly in_reply_to_message_id?: string | null;
+  readonly is_read?: boolean;
+  readonly is_starred?: boolean;
   readonly attachments: MessageAttachmentSummary[];
   readonly headers?: Record<string, string>;
-  readonly status: "queued" | "sent" | "delivered" | "bounced" | "failed";
+  readonly status?: "queued" | "sent" | "delivered" | "bounced" | "failed" | string;
   readonly created_at: string;
 }
 

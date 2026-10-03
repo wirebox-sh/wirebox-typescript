@@ -171,7 +171,10 @@ export class AgentIdentity {
       }
 
       offset += page.messages.length;
-      if (offset >= page.total) {
+      if (page.total !== undefined && offset >= page.total) {
+        break;
+      }
+      if (page.has_more === false) {
         break;
       }
     }
