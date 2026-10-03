@@ -58,6 +58,9 @@ export interface CreateIdentityParams {
 
   /** Optional description explaining the agent's role or purpose. */
   description?: string;
+
+  /** Enable Apple iMessage communication channel */
+  imessage_enabled?: boolean;
 }
 
 export interface UpdateIdentityParams {
@@ -71,6 +74,9 @@ export interface UpdateIdentityParams {
    * - Omitting the field leaves the existing description unchanged.
    */
   description?: string | null;
+
+  /** Enable or disable Apple iMessage router communication channel */
+  imessage_enabled?: boolean;
 }
 
 export interface IdentityMailboxSummary {
@@ -93,6 +99,7 @@ export interface IdentityData {
   readonly display_name: string;
   readonly description: string | null;
   readonly status: "active" | "archived" | "deleted";
+  readonly imessage_enabled?: boolean;
   readonly created_at: string;
   readonly updated_at: string;
   readonly mailboxes?: IdentityMailboxSummary[];

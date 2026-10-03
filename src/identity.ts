@@ -57,6 +57,7 @@ export class AgentIdentity {
   readonly updated_at: string;
   readonly mailbox: IdentityMailboxSummary;
   readonly tunnel: IdentityTunnelSummary;
+  readonly imessage_enabled: boolean;
 
   private readonly _http: HttpTransport;
 
@@ -67,6 +68,7 @@ export class AgentIdentity {
     this.display_name = data.display_name;
     this.description = data.description ?? null;
     this.status = data.status;
+    this.imessage_enabled = Boolean(data.imessage_enabled);
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
 

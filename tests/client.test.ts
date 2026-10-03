@@ -8,14 +8,23 @@ describe("Wirebox Client", () => {
   });
 
   it("throws AuthenticationError when performing actions without API key", async () => {
-    const client = new Wirebox({ apiKey: "" });
-    // Ensure env is clean
-    delete process.env.WIREBOX_API_KEY;
+    const origConfig = process.env.WIREBOX_CONFIG_PATH;
+    process.env.WIREBOX_CONFIG_PATH = "/tmp/non-existent-wirebox-config-" + Date.now();
+    try {
+      delete process.env.WIREBOX_API_KEY;
+      const client = new Wirebox({ apiKey: "" });
 
-    await expect(client.createIdentity({ agent_handle: "bot" })).rejects.toThrow(
-      AuthenticationError
-    );
-    await expect(client.whoami()).rejects.toThrow(AuthenticationError);
+      await expect(client.createIdentity({ agent_handle: "bot" })).rejects.toThrow(
+        AuthenticationError
+      );
+      await expect(client.whoami()).rejects.toThrow(AuthenticationError);
+    } finally {
+      if (origConfig !== undefined) {
+        process.env.WIREBOX_CONFIG_PATH = origConfig;
+      } else {
+        delete process.env.WIREBOX_CONFIG_PATH;
+      }
+    }
   });
 
   it("createIdentity() sends POST /v1/identities and returns AgentIdentity", async () => {

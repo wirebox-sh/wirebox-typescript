@@ -26,37 +26,61 @@ function getEnvApiKey(): string | undefined {
   return undefined;
 }
 
+function getNodeModule(name: string): any {
+  if (typeof (process as any).getBuiltinModule === "function") {
+    try {
+      const mod =
+        (process as any).getBuiltinModule(name) ||
+        (process as any).getBuiltinModule(name.replace(/^node:/, ""));
+      if (mod) return mod;
+    } catch {}
+  }
+  try {
+    if (typeof (globalThis as any).require === "function") {
+      return (globalThis as any).require(name);
+    }
+  } catch {}
+  return undefined;
+}
+
 function getConfigFileApiKey(): string | undefined {
   if (!isNodeRuntime()) return undefined;
 
   try {
-    // Dynamic require in Node environment
-    const fs = (globalThis as any).require("node:fs");
-    const path = (globalThis as any).require("node:path");
-    const os = (globalThis as any).require("node:os");
+    const fs = getNodeModule("node:fs");
+    const path = getNodeModule("node:path");
+    const os = getNodeModule("node:os");
 
-    const home = os.homedir();
-    const configPath = path.join(home, ".wirebox", "config");
+    if (!fs || !path || !os) return undefined;
+
+    const home = process.env.WIREBOX_HOME || os.homedir();
+    const configPath = process.env.WIREBOX_CONFIG_PATH || path.join(home, ".wirebox", "config");
 
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8").trim();
       // Try JSON format
       if (content.startsWith("{")) {
-        const parsed = JSON.parse(content);
-        if (parsed.api_key || parsed.apiKey) {
-          return (parsed.api_key || parsed.apiKey).trim();
-        }
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed.api_key || parsed.apiKey) {
+            return (parsed.api_key || parsed.apiKey).trim();
+          }
+        } catch {}
       }
       // Try INI or KEY=VALUE format
       for (const line of content.split("\n")) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("api_key=") || trimmed.startsWith("apiKey=")) {
-          return trimmed.split("=")[1]?.trim();
+        if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+        const eq = trimmed.indexOf("=");
+        const key = trimmed.slice(0, eq).trim();
+        const value = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
+        if (key === "api_key" || key === "apiKey") {
+          return value;
         }
       }
       // Fallback: entire file is the raw key
       if (content.startsWith("wb_live_")) {
-        return content;
+        return content.split("\n")[0].trim();
       }
     }
   } catch {
