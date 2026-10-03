@@ -39,4 +39,23 @@ describe("resolveApiKey", () => {
     // In test environment without ~/.wirebox/config, it returns undefined
     expect(resolved === undefined || typeof resolved === "string").toBe(true);
   });
+
+  it("resolves from custom WIREBOX_CREDENTIALS_PATH", () => {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const os = require("node:os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wb-cred-test-"));
+    const credFile = path.join(tmpDir, "credentials");
+    fs.writeFileSync(credFile, "api_key=wb_live_custom_cred_file\n");
+
+    process.env.WIREBOX_CREDENTIALS_PATH = credFile;
+    try {
+      const resolved = resolveApiKey();
+      expect(resolved).toBe("wb_live_custom_cred_file");
+    } finally {
+      delete process.env.WIREBOX_CREDENTIALS_PATH;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -54,33 +54,38 @@ function getConfigFileApiKey(): string | undefined {
     if (!fs || !path || !os) return undefined;
 
     const home = process.env.WIREBOX_HOME || os.homedir();
-    const configPath = process.env.WIREBOX_CONFIG_PATH || path.join(home, ".wirebox", "config");
+    const hasCustomPath = Boolean(process.env.WIREBOX_CREDENTIALS_PATH || process.env.WIREBOX_CONFIG_PATH);
+    const candidatePaths = hasCustomPath
+      ? ([process.env.WIREBOX_CREDENTIALS_PATH, process.env.WIREBOX_CONFIG_PATH].filter(Boolean) as string[])
+      : [path.join(home, ".wirebox", "credentials"), path.join(home, ".wirebox", "config")];
 
-    if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, "utf-8").trim();
-      // Try JSON format
-      if (content.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(content);
-          if (parsed.api_key || parsed.apiKey) {
-            return (parsed.api_key || parsed.apiKey).trim();
-          }
-        } catch {}
-      }
-      // Try INI or KEY=VALUE format
-      for (const line of content.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-        const eq = trimmed.indexOf("=");
-        const key = trimmed.slice(0, eq).trim();
-        const value = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
-        if (key === "api_key" || key === "apiKey") {
-          return value;
+    for (const configPath of candidatePaths) {
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, "utf-8").trim();
+        // Try JSON format
+        if (content.startsWith("{")) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.api_key || parsed.apiKey) {
+              return (parsed.api_key || parsed.apiKey).trim();
+            }
+          } catch {}
         }
-      }
-      // Fallback: entire file is the raw key
-      if (content.startsWith("wb_live_")) {
-        return content.split("\n")[0].trim();
+        // Try INI or KEY=VALUE format
+        for (const line of content.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+          const eq = trimmed.indexOf("=");
+          const key = trimmed.slice(0, eq).trim();
+          const value = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
+          if (key === "api_key" || key === "apiKey") {
+            return value;
+          }
+        }
+        // Fallback: entire file is the raw key
+        if (content.startsWith("wb_live_") || content.startsWith("wb_test_")) {
+          return content.split("\n")[0].trim();
+        }
       }
     }
   } catch {
