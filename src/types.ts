@@ -77,6 +77,15 @@ export interface UpdateIdentityParams {
 
   /** Enable or disable Apple iMessage router communication channel */
   imessage_enabled?: boolean;
+
+  /** Legacy / combined mail security filter mode ('whitelist' | 'blacklist') */
+  mail_filter_mode?: "whitelist" | "blacklist";
+
+  /** Inbound mail guardrails posture: only approved senders (whitelist) vs open to anyone (blacklist). */
+  mail_inbound_filter_mode?: "whitelist" | "blacklist";
+
+  /** Outbound mail guardrails posture: only approved recipients (whitelist) vs open to anyone (blacklist). */
+  mail_outbound_filter_mode?: "whitelist" | "blacklist";
 }
 
 export interface IdentityMailboxSummary {
@@ -100,6 +109,9 @@ export interface IdentityData {
   readonly description: string | null;
   readonly status: "active" | "archived" | "deleted";
   readonly imessage_enabled?: boolean;
+  readonly mail_filter_mode?: "whitelist" | "blacklist";
+  readonly mail_inbound_filter_mode?: "whitelist" | "blacklist";
+  readonly mail_outbound_filter_mode?: "whitelist" | "blacklist";
   readonly created_at: string;
   readonly updated_at: string;
   readonly mailboxes?: IdentityMailboxSummary[];
@@ -764,6 +776,92 @@ export interface ListPhoneMessagesResult {
 
 export interface UpdatePhoneMessageParams {
   is_read: boolean;
+}
+
+// ============================================================================
+// Mail Rules & Guardrails Types
+// ============================================================================
+
+/**
+ * Inbound email security posture:
+ * - "protected" (or "allowlist"): Quarantines unknown senders, auto-allows thread replies.
+ * - "open" (or "blocklist"): Open to anyone on the internet.
+ */
+export type InboundMailPolicy = "protected" | "open" | "allowlist" | "blocklist";
+
+/**
+ * Outbound email security posture:
+ * - "restricted" (or "allowlist"): Agent can only send to approved contacts or domains.
+ * - "open" (or "blocklist"): Agent can send emails to any external address.
+ */
+export type OutboundMailPolicy = "restricted" | "open" | "allowlist" | "blocklist";
+
+export interface MailPolicy {
+  /** Inbound posture: "protected" (safe allowlist) or "open" (public) */
+  readonly inbound: "protected" | "open";
+  /** Outbound posture: "restricted" (strict allowlist) or "open" (unrestricted) */
+  readonly outbound: "restricted" | "open";
+}
+
+export interface SetMailPolicyParams {
+  inbound?: InboundMailPolicy;
+  outbound?: OutboundMailPolicy;
+}
+
+export type MailRuleDirection = "inbound" | "outbound" | "reply" | "both";
+export type MailRuleAction = "allow" | "block";
+export type MailRuleStatus = "active" | "paused";
+export type MailRuleMatchType = "exact_email" | "domain" | "wildcard";
+
+export interface MailRule {
+  readonly id: string;
+  readonly agent_handle: string;
+  readonly direction: MailRuleDirection;
+  readonly action: MailRuleAction;
+  readonly entry: string;
+  readonly match_type: MailRuleMatchType;
+  readonly match_target: string;
+  readonly reason: string | null;
+  readonly status: MailRuleStatus;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface CreateMailRuleParams {
+  /** Target email address (e.g. "alice@company.com") or domain (e.g. "@company.com" or "company.com"). */
+  entry: string;
+  /** Direction this rule applies to. Defaults to "both". */
+  direction?: MailRuleDirection;
+  /** Security action: allow or block. Defaults to "allow". */
+  action?: MailRuleAction;
+  /** Optional human-readable audit reason or note. */
+  reason?: string;
+}
+
+export interface UpdateMailRuleParams {
+  direction?: MailRuleDirection;
+  action?: MailRuleAction;
+  status?: MailRuleStatus;
+  reason?: string;
+}
+
+export interface ListMailRulesParams {
+  direction?: MailRuleDirection;
+  action?: MailRuleAction;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListMailRulesResult {
+  readonly rules: MailRule[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface DeleteMailRuleResult {
+  readonly deleted: boolean;
+  readonly id: string;
 }
 
 

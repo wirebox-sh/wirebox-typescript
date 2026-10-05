@@ -9,6 +9,8 @@
 export { Wirebox } from "./client.js";
 export { AgentIdentity } from "./identity.js";
 export { ImessageClient } from "./imessage.js";
+export { MailRulesClient, IdentityMailRulesClient } from "./mail_rules.js";
+export type { AllowBlockOptions } from "./mail_rules.js";
 export { PhoneClient, PhoneNumbersClient, PhoneMessagesClient } from "./phone.js";
 export { TunnelsClient } from "./tunnels.js";
 export { WebhooksClient } from "./webhooks.js";
@@ -105,4 +107,18 @@ export type {
   ListPhoneMessagesParams,
   ListPhoneMessagesResult,
   UpdatePhoneMessageParams,
+  InboundMailPolicy,
+  OutboundMailPolicy,
+  MailPolicy,
+  SetMailPolicyParams,
+  MailRuleDirection,
+  MailRuleAction,
+  MailRuleStatus,
+  MailRuleMatchType,
+  MailRule,
+  CreateMailRuleParams,
+  UpdateMailRuleParams,
+  ListMailRulesParams,
+  ListMailRulesResult,
+  DeleteMailRuleResult,
 } from "./types.js";

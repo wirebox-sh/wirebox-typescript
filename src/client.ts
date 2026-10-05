@@ -9,6 +9,7 @@ import { AuthenticationError, NotFoundError } from "./errors.js";
 import { HttpTransport } from "./http.js";
 import { AgentIdentity } from "./identity.js";
 import { ImessageClient } from "./imessage.js";
+import { MailRulesClient } from "./mail_rules.js";
 import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
@@ -33,6 +34,7 @@ export class Wirebox {
   readonly webhooks: WebhooksClient;
   readonly imessage: ImessageClient;
   readonly phone: PhoneClient;
+  readonly mailRules: MailRulesClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -53,6 +55,7 @@ export class Wirebox {
     this.webhooks = new WebhooksClient(this._http);
     this.imessage = new ImessageClient(this._http);
     this.phone = new PhoneClient(this._http);
+    this.mailRules = new MailRulesClient(this._http);
   }
 
   // ==========================================================================

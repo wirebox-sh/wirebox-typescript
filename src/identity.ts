@@ -7,6 +7,7 @@
 
 import type { HttpTransport } from "./http.js";
 import { ImessageClient } from "./imessage.js";
+import { IdentityMailRulesClient } from "./mail_rules.js";
 import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
@@ -28,6 +29,7 @@ import type {
   ListPhoneMessagesParams,
   ListPhoneMessagesResult,
   ListWebhooksParams,
+  MailPolicy,
   MarkImessageConversationReadResult,
   MessageSummary,
   PhoneMessage,
@@ -38,6 +40,7 @@ import type {
   SendEmailParams,
   SendEmailResult,
   SendImessageResult,
+  SetMailPolicyParams,
   Tunnel,
   TunnelConnectOptions,
   TunnelSession,
@@ -58,6 +61,11 @@ export class AgentIdentity {
   readonly mailbox: IdentityMailboxSummary;
   readonly tunnel: IdentityTunnelSummary;
   readonly imessage_enabled: boolean;
+  readonly mail_filter_mode?: "whitelist" | "blacklist";
+  readonly mail_inbound_filter_mode?: "whitelist" | "blacklist";
+  readonly mail_outbound_filter_mode?: "whitelist" | "blacklist";
+  readonly mailPolicy: MailPolicy;
+  readonly mailRules: IdentityMailRulesClient;
 
   private readonly _http: HttpTransport;
 
@@ -69,8 +77,20 @@ export class AgentIdentity {
     this.description = data.description ?? null;
     this.status = data.status;
     this.imessage_enabled = Boolean(data.imessage_enabled);
+    this.mail_filter_mode = data.mail_filter_mode;
+    this.mail_inbound_filter_mode = data.mail_inbound_filter_mode;
+    this.mail_outbound_filter_mode = data.mail_outbound_filter_mode;
+
+    const inMode = data.mail_inbound_filter_mode || data.mail_filter_mode;
+    const outMode = data.mail_outbound_filter_mode || data.mail_filter_mode;
+    this.mailPolicy = {
+      inbound: inMode === "whitelist" ? "protected" : "open",
+      outbound: outMode === "whitelist" ? "restricted" : "open",
+    };
+
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
+    this.mailRules = new IdentityMailRulesClient(http, this.agent_handle);
 
     const primaryMbx = data.mailboxes && data.mailboxes.length > 0 ? data.mailboxes[0] : undefined;
     this.mailbox = primaryMbx ?? {
@@ -98,12 +118,64 @@ export class AgentIdentity {
    * Updates this agent identity's profile attributes.
    * Returns a new AgentIdentity instance reflecting the updated state.
    */
-  async update(params: UpdateIdentityParams): Promise<AgentIdentity> {
+  async update(params: UpdateIdentityParams, options?: RequestOptions): Promise<AgentIdentity> {
     const updated = await this._http.patch<IdentityData>(
       `/v1/identities/${encodeURIComponent(this.agent_handle)}`,
-      params
+      params,
+      options
     );
     return new AgentIdentity(updated, this._http);
+  }
+
+  /**
+   * Configures inbound and outbound email security policies for this agent identity.
+   *
+   * @example
+   * ```ts
+   * await agent.setMailPolicy({ inbound: "protected", outbound: "restricted" });
+   * ```
+   *
+   * @param policy Inbound ('protected' | 'open') and outbound ('restricted' | 'open') postures.
+   * @param options Optional custom request options.
+   * @returns An updated AgentIdentity instance reflecting the new security posture.
+   */
+  async setMailPolicy(
+    policy: SetMailPolicyParams,
+    options?: RequestOptions
+  ): Promise<AgentIdentity> {
+    let targetInbound: "whitelist" | "blacklist" | undefined;
+    if (policy.inbound !== undefined) {
+      targetInbound =
+        policy.inbound === "protected" || policy.inbound === "allowlist"
+          ? "whitelist"
+          : "blacklist";
+    }
+
+    let targetOutbound: "whitelist" | "blacklist" | undefined;
+    if (policy.outbound !== undefined) {
+      targetOutbound =
+        policy.outbound === "restricted" || policy.outbound === "allowlist"
+          ? "whitelist"
+          : "blacklist";
+    }
+
+    return this.update(
+      {
+        mail_inbound_filter_mode: targetInbound,
+        mail_outbound_filter_mode: targetOutbound,
+      },
+      options
+    );
+  }
+
+  /**
+   * Alias for setMailPolicy().
+   */
+  async setMailPolicies(
+    policies: SetMailPolicyParams,
+    options?: RequestOptions
+  ): Promise<AgentIdentity> {
+    return this.setMailPolicy(policies, options);
   }
 
   /**
