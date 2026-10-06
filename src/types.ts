@@ -114,6 +114,8 @@ export interface IdentityData {
   readonly mail_outbound_filter_mode?: "whitelist" | "blacklist";
   readonly created_at: string;
   readonly updated_at: string;
+  readonly email_address?: string;
+  readonly mailbox?: IdentityMailboxSummary;
   readonly mailboxes?: IdentityMailboxSummary[];
   readonly tunnel?: IdentityTunnelSummary;
   readonly tunnels?: IdentityTunnelSummary[];
@@ -281,9 +283,157 @@ export interface ReplyEmailParams {
   attachments?: SendEmailAttachment[];
 }
 
+export interface ForwardEmailParams {
+  /** Forward recipient email address(es) */
+  to: string | string[];
+
+  /** Optional subject line override (defaults to 'Fwd: <original>') */
+  subject?: string;
+
+  /** Optional commentary note prepended above forwarded message (plain text) */
+  body_text?: string;
+
+  /** Optional commentary note prepended above forwarded message (HTML) */
+  body_html?: string;
+
+  /** Alias for body_text */
+  text?: string;
+
+  /** Alias for body_html */
+  html?: string;
+
+  /** Optional CC addresses */
+  cc?: string | string[];
+
+  /** Optional BCC addresses */
+  bcc?: string | string[];
+
+  /** Whether to forward original email attachments (defaults to true) */
+  forward_attachments?: boolean;
+
+  /** Optional additional file attachments */
+  attachments?: SendEmailAttachment[];
+
+  /** Optional custom headers */
+  headers?: Record<string, string>;
+}
+
+export interface ForwardEmailResult {
+  readonly id: string;
+  readonly thread_id: string;
+  readonly status: string;
+}
+
 export interface DeleteMessageResult {
   readonly deleted: boolean;
   readonly message_id: string;
+}
+
+// ============================================================================
+// Email Draft Types
+// ============================================================================
+
+export interface DraftAttachment {
+  readonly id: string;
+  readonly filename: string;
+  readonly content_type: string;
+  readonly size_bytes: number;
+  readonly content_id?: string | null;
+  readonly url?: string | null;
+}
+
+export interface Draft {
+  readonly id: string;
+  readonly mailbox_id: string;
+  readonly thread_id?: string | null;
+  readonly in_reply_to_message_id?: string | null;
+  readonly forward_of_message_id?: string | null;
+  readonly reply_all: boolean;
+  readonly forward_attachments: boolean;
+  readonly to: string[];
+  readonly cc: string[];
+  readonly bcc: string[];
+  readonly subject: string | null;
+  readonly snippet: string | null;
+  readonly text: string | null;
+  readonly html: string | null;
+  readonly status: "draft" | "sending" | "sent";
+  readonly version: number;
+  readonly has_attachments: boolean;
+  readonly attachments: DraftAttachment[];
+  readonly headers?: Record<string, string>;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface CreateDraftParams {
+  to?: string | string[];
+  cc?: string | string[];
+  bcc?: string | string[];
+  subject?: string;
+  text?: string;
+  html?: string;
+  in_reply_to?: string;
+  forward_of?: string;
+  reply_all?: boolean;
+  forward_attachments?: boolean;
+  attachments?: SendEmailAttachment[];
+  headers?: Record<string, string>;
+}
+
+export interface UpdateDraftParams {
+  to?: string | string[] | null;
+  cc?: string | string[] | null;
+  bcc?: string | string[] | null;
+  subject?: string | null;
+  text?: string | null;
+  html?: string | null;
+  version?: number;
+  add_attachments?: SendEmailAttachment[];
+  remove_attachments?: string[];
+  headers?: Record<string, string> | null;
+}
+
+export interface ListDraftsParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListDraftsResult {
+  readonly drafts: Draft[];
+  readonly count: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface IterDraftsParams {
+  limit?: number;
+}
+
+export interface SendDraftOverrides {
+  to?: string | string[];
+  cc?: string | string[];
+  bcc?: string | string[];
+  subject?: string;
+  text?: string;
+  html?: string;
+}
+
+export interface SendDraftOptions extends RequestOptions {
+  version?: number;
+  overrides?: SendDraftOverrides;
+  idempotencyKey?: string;
+}
+
+export interface SendDraftResult {
+  readonly id: string;
+  readonly thread_id: string;
+  readonly status: "sent";
+}
+
+export interface DeleteDraftResult {
+  readonly id: string;
+  readonly deleted: boolean;
 }
 
 // ============================================================================

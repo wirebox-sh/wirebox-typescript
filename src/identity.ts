@@ -12,16 +12,24 @@ import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
 import type {
+  CreateDraftParams,
   CreateWebhookParams,
+  DeleteDraftResult,
   DeleteMessageResult,
   DisconnectImessageConversationResult,
+  Draft,
   EmailMessage,
+  ForwardEmailParams,
+  ForwardEmailResult,
   IdentityData,
   IdentityMailboxSummary,
   IdentityTunnelSummary,
   ImessageMessage,
   ImessageRouterInfo,
+  IterDraftsParams,
   IterMessagesParams,
+  ListDraftsParams,
+  ListDraftsResult,
   ListImessageConversationsResult,
   ListImessageMessagesResult,
   ListMessagesParams,
@@ -37,6 +45,8 @@ import type {
   ProvisionPhoneNumberParams,
   ReplyEmailParams,
   RequestOptions,
+  SendDraftOptions,
+  SendDraftResult,
   SendEmailParams,
   SendEmailResult,
   SendImessageResult,
@@ -44,6 +54,7 @@ import type {
   Tunnel,
   TunnelConnectOptions,
   TunnelSession,
+  UpdateDraftParams,
   UpdateIdentityParams,
   Webhook,
   WebhookCreateResult,
@@ -92,10 +103,10 @@ export class AgentIdentity {
     this.updated_at = data.updated_at;
     this.mailRules = new IdentityMailRulesClient(http, this.agent_handle);
 
-    const primaryMbx = data.mailboxes && data.mailboxes.length > 0 ? data.mailboxes[0] : undefined;
+    const primaryMbx = data.mailbox || (data.mailboxes && data.mailboxes.length > 0 ? data.mailboxes[0] : undefined);
     this.mailbox = primaryMbx ?? {
       id: "",
-      email_address: `${data.agent_handle}@wireboxmail.com`,
+      email_address: data.email_address || `${data.agent_handle}@wireboxmail.com`,
       created_at: data.created_at,
     };
 
@@ -274,12 +285,154 @@ export class AgentIdentity {
   }
 
   /**
+   * Forwards an existing email message to new recipients.
+   *
+   * Automatically generates an independent conversation thread, RFC quote headers,
+   * and preserves original Cloudflare R2 attachments by default.
+   */
+  async forwardEmail(message_id: string, params: ForwardEmailParams): Promise<ForwardEmailResult> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.post<ForwardEmailResult>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/messages/${encodeURIComponent(message_id)}/forward`,
+      params
+    );
+  }
+
+  /**
    * Deletes an email message from this agent's mailbox.
    */
   async deleteMessage(message_id: string): Promise<DeleteMessageResult> {
     const mailboxAddress = this.mailbox.email_address;
     return this._http.delete<DeleteMessageResult>(
       `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/messages/${encodeURIComponent(message_id)}`
+    );
+  }
+
+  // ==========================================================================
+  // Email Draft Methods
+  // ==========================================================================
+
+  /**
+   * Creates a new email draft (plain, reply, or forward).
+   */
+  async createDraft(params: CreateDraftParams, options?: RequestOptions): Promise<Draft> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.post<Draft>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts`,
+      params,
+      options
+    );
+  }
+
+  /**
+   * Retrieves a paginated list of drafts in this agent's mailbox.
+   */
+  async listDrafts(params?: ListDraftsParams, options?: RequestOptions): Promise<ListDraftsResult> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.get<ListDraftsResult>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts`,
+      {
+        limit: params?.limit,
+        offset: params?.offset,
+      },
+      options
+    );
+  }
+
+  /**
+   * Auto-paginating async generator yielding drafts across the draft mailbox.
+   *
+   * @example
+   * for await (const draft of agent.iterDrafts()) {
+   *   console.log(draft.subject, draft.version);
+   * }
+   */
+  async *iterDrafts(params?: IterDraftsParams): AsyncGenerator<Draft, void, unknown> {
+    const limit = params?.limit ?? 50;
+    let offset = 0;
+
+    while (true) {
+      const page = await this.listDrafts({ limit, offset });
+      if (!page.drafts || page.drafts.length === 0) {
+        break;
+      }
+
+      for (const draft of page.drafts) {
+        yield draft;
+      }
+
+      offset += page.drafts.length;
+      if (page.count !== undefined && offset >= page.count) {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Retrieves complete details of an email draft, including signed attachment download URLs.
+   */
+  async getDraft(draft_id: string, options?: RequestOptions): Promise<Draft> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.get<Draft>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts/${encodeURIComponent(draft_id)}`,
+      undefined,
+      options
+    );
+  }
+
+  /**
+   * Updates an existing email draft with delta body, recipients, attachments, or version check.
+   */
+  async updateDraft(
+    draft_id: string,
+    params: UpdateDraftParams,
+    options?: RequestOptions
+  ): Promise<Draft> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.patch<Draft>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts/${encodeURIComponent(draft_id)}`,
+      params,
+      options
+    );
+  }
+
+  /**
+   * Permanently deletes a draft and purges its draft-scoped attachments from storage.
+   */
+  async deleteDraft(draft_id: string, options?: RequestOptions): Promise<DeleteDraftResult> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.delete<DeleteDraftResult>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts/${encodeURIComponent(draft_id)}`,
+      options
+    );
+  }
+
+  /**
+   * Sends an email draft, promoting attachments and converting it into a sent message.
+   *
+   * @param draft_id Unique draft ID to dispatch.
+   * @param options Optional overrides, custom headers, or Idempotency-Key.
+   */
+  async sendDraft(draft_id: string, options?: SendDraftOptions): Promise<SendDraftResult> {
+    const mailboxAddress = this.mailbox.email_address;
+    const headers: Record<string, string> = {};
+    if (options?.idempotencyKey) {
+      headers["Idempotency-Key"] = options.idempotencyKey;
+    }
+    const reqOptions: RequestOptions = {
+      ...options,
+      headers: { ...headers, ...options?.headers },
+    };
+    const body: Record<string, unknown> = {
+      ...(options?.overrides || {}),
+    };
+    if (options?.version !== undefined) {
+      body.version = options.version;
+    }
+    return this._http.post<SendDraftResult>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/drafts/${encodeURIComponent(draft_id)}/send`,
+      body,
+      reqOptions
     );
   }
 

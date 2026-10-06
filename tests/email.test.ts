@@ -196,6 +196,40 @@ describe("AgentIdentity Email Actions", () => {
     expect(result.message_id).toBe("msg_reply_002");
   });
 
+  it("forwardEmail() sends POST to forward endpoint with options", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        id: "msg_fwd_003",
+        thread_id: "thd_new_999",
+        status: "sent",
+      }),
+    } as Response);
+
+    const result = await agent.forwardEmail("msg_001", {
+      to: "accounting@example.com",
+      body_text: "FYI, forwarding the signed invoice.",
+      forward_attachments: true,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.wirebox.sh/v1/mailboxes/sales-bot%40wireboxmail.com/messages/msg_001/forward",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          to: "accounting@example.com",
+          body_text: "FYI, forwarding the signed invoice.",
+          forward_attachments: true,
+        }),
+      })
+    );
+    expect(result.id).toBe("msg_fwd_003");
+    expect(result.thread_id).toBe("thd_new_999");
+    expect(result.status).toBe("sent");
+  });
+
   it("deleteMessage() sends DELETE request", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
