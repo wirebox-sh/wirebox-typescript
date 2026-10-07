@@ -63,6 +63,8 @@ export type {
   MessageSummary,
   ListMessagesResult,
   IterMessagesParams,
+  SearchMessagesParams,
+  SearchMessagesResult,
   EmailMessage,
   ReplyEmailParams,
   ForwardEmailParams,

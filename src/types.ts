@@ -220,6 +220,10 @@ export interface MessageSummary {
   readonly status?: "queued" | "sent" | "delivered" | "bounced" | "failed" | string;
   readonly created_at: string;
   readonly snippet?: string;
+  /** Highlighted fragment around the best match (search results only). */
+  readonly highlight?: string;
+  /** Highlighted fragments grouped by field (search results only). */
+  readonly highlights?: { readonly text?: string[] };
 }
 
 export interface ListMessagesResult {
@@ -235,6 +239,25 @@ export interface IterMessagesParams {
 
   /** Filter by delivery status */
   status?: "queued" | "sent" | "delivered" | "bounced" | "failed";
+}
+
+export interface SearchMessagesParams {
+  /** Full-text search query. */
+  q: string;
+
+  /** Maximum number of matches to return (1–100, default 50). */
+  limit?: number;
+}
+
+export interface SearchMessagesResult {
+  /** Matching messages, ranked by relevance. */
+  readonly messages: MessageSummary[];
+
+  /** Number of matches in this response. */
+  readonly count: number;
+
+  readonly next_cursor?: string | null;
+  readonly has_more?: boolean;
 }
 
 export interface EmailMessage {

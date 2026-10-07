@@ -45,6 +45,8 @@ import type {
   ProvisionPhoneNumberParams,
   ReplyEmailParams,
   RequestOptions,
+  SearchMessagesParams,
+  SearchMessagesResult,
   SendDraftOptions,
   SendDraftResult,
   SendEmailParams,
@@ -261,6 +263,24 @@ export class AgentIdentity {
         break;
       }
     }
+  }
+
+  /**
+   * Full-text search across this agent's mailbox, ranked by relevance.
+   *
+   * @example
+   * const { messages } = await agent.searchMessages({ q: "invoice overdue" });
+   * console.log(messages[0]?.highlight);
+   */
+  async searchMessages(params: SearchMessagesParams): Promise<SearchMessagesResult> {
+    const mailboxAddress = this.mailbox.email_address;
+    return this._http.get<SearchMessagesResult>(
+      `/v1/mailboxes/${encodeURIComponent(mailboxAddress)}/search`,
+      {
+        q: params.q,
+        limit: params.limit,
+      }
+    );
   }
 
   /**
