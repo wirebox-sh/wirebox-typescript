@@ -12,6 +12,7 @@ import { ImessageClient } from "./imessage.js";
 import { MailRulesClient } from "./mail_rules.js";
 import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
+import { VaultClient } from "./vault/client.js";
 import { WebhooksClient } from "./webhooks.js";
 import type {
   AgentSignupParams,
@@ -35,6 +36,7 @@ export class Wirebox {
   readonly imessage: ImessageClient;
   readonly phone: PhoneClient;
   readonly mailRules: MailRulesClient;
+  readonly vault: VaultClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -56,6 +58,7 @@ export class Wirebox {
     this.imessage = new ImessageClient(this._http);
     this.phone = new PhoneClient(this._http);
     this.mailRules = new MailRulesClient(this._http);
+    this.vault = new VaultClient(this._http);
   }
 
   // ==========================================================================

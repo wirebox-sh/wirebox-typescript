@@ -138,6 +138,50 @@ export class VerificationCodeExpiredError extends ValidationError {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Vault errors
+// ---------------------------------------------------------------------------
+
+/** The organization has no vault yet; call `vault.initialize()` first. */
+export class VaultNotInitializedError extends WireboxAPIError {
+  constructor(status: number, code: string, message: string, requestId?: string, raw?: unknown) {
+    super(status, code, message, requestId, raw);
+    this.name = "VaultNotInitializedError";
+  }
+}
+
+/** A vault already exists for this organization. */
+export class VaultAlreadyInitializedError extends WireboxAPIError {
+  constructor(status: number, code: string, message: string, requestId?: string, raw?: unknown) {
+    super(status, code, message, requestId, raw);
+    this.name = "VaultAlreadyInitializedError";
+  }
+}
+
+/** The vault key did not match: unlock failed (server 401) or local decryption failed. */
+export class InvalidVaultKeyError extends WireboxAPIError {
+  constructor(status: number, code: string, message: string, requestId?: string, raw?: unknown) {
+    super(status, code, message, requestId, raw);
+    this.name = "InvalidVaultKeyError";
+  }
+}
+
+/** A secret id was not present in the unlocked vault. */
+export class VaultSecretNotFoundError extends WireboxError {
+  constructor(message: string) {
+    super(message);
+    this.name = "VaultSecretNotFoundError";
+  }
+}
+
+/** A typed getter was used for a secret of a different type. */
+export class VaultSecretTypeError extends WireboxError {
+  constructor(message: string) {
+    super(message);
+    this.name = "VaultSecretTypeError";
+  }
+}
+
 /**
  * Parses raw API error responses and maps them to appropriate WireboxAPIError subclasses.
  */
@@ -169,6 +213,12 @@ export function parseApiError(
       return new InvalidVerificationCodeError(status, code, message, requestId, body);
     case "verification_code_expired":
       return new VerificationCodeExpiredError(status, code, message, requestId, body);
+    case "vault_not_initialized":
+      return new VaultNotInitializedError(status, code, message, requestId, body);
+    case "vault_already_initialized":
+      return new VaultAlreadyInitializedError(status, code, message, requestId, body);
+    case "invalid_vault_key":
+      return new InvalidVaultKeyError(status, code, message, requestId, body);
     default:
       break;
   }
