@@ -96,17 +96,31 @@ export class VaultClient {
   }
 
   /**
-   * Unlock the vault with a vault key and return a crypto-enabled handle.
-   * Derives the master key from the server-stored salt + params, verifies via
-   * the auth hash, and decrypts every secret the caller is allowed to read.
+   * Unlock the vault and return a crypto-enabled handle. Derives the master key
+   * from the server-stored salt + params, verifies via the auth hash, and
+   * decrypts every secret the caller is allowed to read.
+   *
+   * @param vaultKey - The vault key. When omitted, falls back to the
+   *   `WIREBOX_VAULT_KEY` environment variable (convenient for agent processes).
    */
-  async unlock(vaultKey: string): Promise<UnlockedVault> {
+  async unlock(vaultKey?: string): Promise<UnlockedVault> {
+    const key =
+      vaultKey ??
+      (typeof process !== "undefined" ? process.env?.WIREBOX_VAULT_KEY : undefined);
+    if (!key) {
+      throw new InvalidVaultKeyError(
+        401,
+        "missing_vault_key",
+        "A vault key is required. Pass it to unlock() or set WIREBOX_VAULT_KEY."
+      );
+    }
+
     const info = await this.info();
     if (!info.initialized || !info.kdf_salt) {
       throw new VaultNotInitializedError(404, "vault_not_initialized", "No vault exists for this organization.");
     }
 
-    const masterKey = await deriveMasterKey(vaultKey, fromBase64(info.kdf_salt), info.kdf_params);
+    const masterKey = await deriveMasterKey(key, fromBase64(info.kdf_salt), info.kdf_params);
     const authHash = await computeAuthHash(masterKey);
 
     const data = await this._http.get<RawUnlockResponse>(`${BASE}/unlock`, { auth_hash: authHash });
@@ -191,43 +205,61 @@ export class UnlockedVault {
     return [...this._byId.values()];
   }
 
-  /** Get a decrypted secret by id from the unlocked set. */
-  getSecret(secretId: string): DecryptedSecret {
-    const secret = this._byId.get(secretId);
-    if (!secret) {
-      throw new VaultSecretNotFoundError(`No secret with id '${secretId}' in the unlocked vault.`);
+  /**
+   * Get a decrypted secret from the unlocked set by id or by name. Ids (which
+   * start with `vsec_`) match exactly; otherwise the value is matched against
+   * secret names (case-insensitive), which is how agents usually refer to them
+   * ("GitHub" rather than `vsec_...`).
+   */
+  getSecret(nameOrId: string): DecryptedSecret {
+    const byId = this._byId.get(nameOrId);
+    if (byId) return byId;
+
+    const lower = nameOrId.toLowerCase();
+    const byName = [...this._byId.values()].filter((s) => s.name.toLowerCase() === lower);
+    if (byName.length === 1) return byName[0]!;
+    if (byName.length > 1) {
+      throw new VaultSecretTypeError(
+        `Multiple secrets are named '${nameOrId}'. Use the secret id (vsec_...) to disambiguate.`
+      );
     }
-    return secret;
+    throw new VaultSecretNotFoundError(`No secret named or identified by '${nameOrId}' in the unlocked vault.`);
   }
 
-  private getTyped<T extends SecretPayload>(secretId: string, type: VaultSecretType): T {
-    const secret = this.getSecret(secretId);
+  /** Get a decrypted secret by its name (case-insensitive). */
+  getByName(name: string): DecryptedSecret {
+    return this.getSecret(name);
+  }
+
+  private getTyped<T extends SecretPayload>(nameOrId: string, type: VaultSecretType): T {
+    const secret = this.getSecret(nameOrId);
     if (secret.type !== type) {
-      throw new VaultSecretTypeError(`Secret '${secretId}' is of type '${secret.type}', not '${type}'.`);
+      throw new VaultSecretTypeError(`Secret '${secret.name}' is of type '${secret.type}', not '${type}'.`);
     }
     return secret.payload as T;
   }
 
-  /** Get the login payload for a `login` secret. */
-  getLogin(secretId: string): LoginPayload {
-    return this.getTyped<LoginPayload>(secretId, VaultSecretType.LOGIN);
+  /** Get the login payload for a `login` secret, by id or name. */
+  getLogin(nameOrId: string): LoginPayload {
+    return this.getTyped<LoginPayload>(nameOrId, VaultSecretType.LOGIN);
   }
 
-  /** Get the payload for an `api_key` secret. */
-  getApiKey(secretId: string): ApiKeyPayload {
-    return this.getTyped<ApiKeyPayload>(secretId, VaultSecretType.API_KEY);
+  /** Get the payload for an `api_key` secret, by id or name. */
+  getApiKey(nameOrId: string): ApiKeyPayload {
+    return this.getTyped<ApiKeyPayload>(nameOrId, VaultSecretType.API_KEY);
   }
 
-  /** Get the payload for an `other` secret. */
-  getOther(secretId: string): OtherPayload {
-    return this.getTyped<OtherPayload>(secretId, VaultSecretType.OTHER);
+  /** Get the payload for an `other` secret, by id or name. */
+  getOther(nameOrId: string): OtherPayload {
+    return this.getTyped<OtherPayload>(nameOrId, VaultSecretType.OTHER);
   }
 
-  /** Current TOTP code for a `login` secret that has TOTP configured. */
-  async getTotpCode(secretId: string): Promise<TOTPCode> {
-    const login = this.getLogin(secretId);
+  /** Current TOTP code for a `login` secret that has TOTP configured, by id or name. */
+  async getTotpCode(nameOrId: string): Promise<TOTPCode> {
+    const secret = this.getSecret(nameOrId);
+    const login = this.getLogin(secret.id);
     if (!login.totp) {
-      throw new VaultSecretTypeError(`Secret '${secretId}' has no TOTP configured.`);
+      throw new VaultSecretTypeError(`Secret '${secret.name}' has no TOTP configured.`);
     }
     return generateTotp(login.totp);
   }
@@ -253,27 +285,34 @@ export class UnlockedVault {
     return secret;
   }
 
-  /** Update a secret's metadata and/or payload. Re-encrypts when a payload is given. Admin only. */
+  /** Update a secret's metadata and/or payload, by id or name. Re-encrypts when a payload is given. Admin only. */
   async updateSecret(
-    secretId: string,
+    nameOrId: string,
     changes: { name?: string; description?: string | null; payload?: SecretPayload }
   ): Promise<DecryptedSecret> {
+    const target = this.getSecret(nameOrId);
     const body: Record<string, unknown> = {};
     if (changes.name !== undefined) body.name = changes.name;
     if (changes.description !== undefined) body.description = changes.description;
     if (changes.payload !== undefined) {
-      body.encrypted_payload = await encryptPayload(this._orgKey, changes.payload, secretId);
+      body.encrypted_payload = await encryptPayload(this._orgKey, changes.payload, target.id);
     }
 
     const summary = await this._http.patch<VaultSecretSummary>(
-      `${BASE}/secrets/${encodeURIComponent(secretId)}`,
+      `${BASE}/secrets/${encodeURIComponent(target.id)}`,
       body
     );
 
-    const existing = this._byId.get(secretId);
-    const payload = changes.payload ?? existing?.payload ?? ({ data: "" } as SecretPayload);
+    const payload = changes.payload ?? target.payload;
     const secret: DecryptedSecret = { ...summary, payload };
     this._byId.set(secret.id, secret);
     return secret;
+  }
+
+  /** Delete a secret (and its access grants), by id or name. Admin only. */
+  async deleteSecret(nameOrId: string): Promise<void> {
+    const target = this.getSecret(nameOrId);
+    await this._http.delete<void>(`${BASE}/secrets/${encodeURIComponent(target.id)}`);
+    this._byId.delete(target.id);
   }
 }

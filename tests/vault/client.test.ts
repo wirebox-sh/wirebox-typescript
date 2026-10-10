@@ -287,4 +287,38 @@ describe("VaultClient — end-to-end round-trip (fake server)", () => {
   it("unlock() on an uninitialized vault throws", async () => {
     await expect(client.vault.unlock("WBV-anything")).rejects.toBeInstanceOf(VaultNotInitializedError);
   });
+
+  it("resolves secrets by name as well as id (get/getLogin/getTotpCode/delete)", async () => {
+    const { vaultKey } = await client.vault.initialize();
+    const vault = await client.vault.unlock(vaultKey);
+    const created = await vault.createSecret({
+      type: VaultSecretType.LOGIN,
+      name: "GitHub",
+      payload: { username: "eva", password: "pw", totp: { secret: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ" } },
+    });
+
+    // by name (case-insensitive)
+    expect(vault.getSecret("github").id).toBe(created.id);
+    expect(vault.getByName("GitHub").id).toBe(created.id);
+    expect(vault.getLogin("GitHub").username).toBe("eva");
+    expect((await vault.getTotpCode("GitHub")).code).toMatch(/^\d{6}$/);
+
+    // deleteSecret is available on the unlocked vault (regression for the two-surface split)
+    expect(typeof vault.deleteSecret).toBe("function");
+    await vault.deleteSecret("GitHub");
+    expect(() => vault.getSecret("GitHub")).toThrow();
+  });
+
+  it("unlock() falls back to WIREBOX_VAULT_KEY when no key is passed", async () => {
+    const { vaultKey } = await client.vault.initialize();
+    const prev = process.env.WIREBOX_VAULT_KEY;
+    process.env.WIREBOX_VAULT_KEY = vaultKey;
+    try {
+      const vault = await client.vault.unlock();
+      expect(Array.isArray(vault.secrets)).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.WIREBOX_VAULT_KEY;
+      else process.env.WIREBOX_VAULT_KEY = prev;
+    }
+  });
 });
