@@ -276,12 +276,13 @@ describe("VaultClient — end-to-end round-trip (fake server)", () => {
     const vault = await client.vault.unlock(vaultKey);
     const secret = await vault.createSecret({ type: VaultSecretType.OTHER, name: "s", payload: { data: "x" } });
 
-    const grant = await client.vault.grantAccess(secret.id, "agt_bot");
+    // Address the secret by name (resolved to its id) as well as by id.
+    const grant = await client.vault.grantAccess("s", "agt_bot");
     expect(grant.identity_id).toBe("agt_bot");
-    expect(await client.vault.listAccess(secret.id)).toHaveLength(1);
+    expect(await client.vault.listAccess("s")).toHaveLength(1);
 
     await client.vault.revokeAccess(secret.id, "agt_bot");
-    expect(await client.vault.listAccess(secret.id)).toHaveLength(0);
+    expect(await client.vault.listAccess("s")).toHaveLength(0);
   });
 
   it("unlock() on an uninitialized vault throws", async () => {

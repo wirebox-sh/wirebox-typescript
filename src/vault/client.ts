@@ -156,32 +156,45 @@ export class VaultClient {
     return res.secrets ?? [];
   }
 
-  /** List the identities granted access to a secret. Admin only. */
-  async listAccess(secretId: string): Promise<VaultAccessGrant[]> {
-    const res = await this._http.get<{ access: VaultAccessGrant[] }>(
-      `${BASE}/secrets/${encodeURIComponent(secretId)}/access`
-    );
+  /** Resolve a secret name to its id (ids starting with `vsec_` pass through). */
+  private async resolveSecretId(nameOrId: string): Promise<string> {
+    if (nameOrId.startsWith("vsec_")) return nameOrId;
+    const secrets = await this.listSecrets();
+    const matches = secrets.filter((s) => s.name.toLowerCase() === nameOrId.toLowerCase());
+    if (matches.length === 1) return matches[0]!.id;
+    if (matches.length > 1) {
+      throw new Error(`Multiple secrets are named '${nameOrId}'. Use the secret id (vsec_...).`);
+    }
+    throw new VaultSecretNotFoundError(`No secret named or identified by '${nameOrId}'.`);
+  }
+
+  /** List the identities granted access to a secret (by name or id). Admin only. */
+  async listAccess(secret: string): Promise<VaultAccessGrant[]> {
+    const id = await this.resolveSecretId(secret);
+    const res = await this._http.get<{ access: VaultAccessGrant[] }>(`${BASE}/secrets/${encodeURIComponent(id)}/access`);
     return res.access ?? [];
   }
 
-  /** Grant an agent identity access to a secret. Admin only. */
-  async grantAccess(secretId: string, identityId: string): Promise<VaultAccessGrant> {
-    return this._http.post<VaultAccessGrant>(
-      `${BASE}/secrets/${encodeURIComponent(secretId)}/access`,
-      { identity_id: identityId }
-    );
+  /** Grant an agent identity access to a secret (by name or id). Admin only. */
+  async grantAccess(secret: string, identityId: string): Promise<VaultAccessGrant> {
+    const id = await this.resolveSecretId(secret);
+    return this._http.post<VaultAccessGrant>(`${BASE}/secrets/${encodeURIComponent(id)}/access`, {
+      identity_id: identityId,
+    });
   }
 
-  /** Revoke an identity's access to a secret. Admin only. */
-  async revokeAccess(secretId: string, identityId: string): Promise<void> {
+  /** Revoke an identity's access to a secret (by name or id). Admin only. */
+  async revokeAccess(secret: string, identityId: string): Promise<void> {
+    const id = await this.resolveSecretId(secret);
     await this._http.delete<void>(
-      `${BASE}/secrets/${encodeURIComponent(secretId)}/access/${encodeURIComponent(identityId)}`
+      `${BASE}/secrets/${encodeURIComponent(id)}/access/${encodeURIComponent(identityId)}`
     );
   }
 
-  /** Permanently delete a secret (and its access grants). Admin only. */
-  async deleteSecret(secretId: string): Promise<void> {
-    await this._http.delete<void>(`${BASE}/secrets/${encodeURIComponent(secretId)}`);
+  /** Permanently delete a secret (by name or id), and its access grants. Admin only. */
+  async deleteSecret(secret: string): Promise<void> {
+    const id = await this.resolveSecretId(secret);
+    await this._http.delete<void>(`${BASE}/secrets/${encodeURIComponent(id)}`);
   }
 }
 
