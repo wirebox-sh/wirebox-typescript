@@ -83,4 +83,16 @@ describe("AgentIdentity Domain Object", () => {
       expect.objectContaining({ method: "DELETE" })
     );
   });
+
+  it("does not leak the API key (or transport) when serialized", () => {
+    const identity = new AgentIdentity(sampleData, transport);
+    const serialized = JSON.stringify(identity);
+    expect(serialized).not.toContain("wb_live_test_123");
+    expect(serialized).not.toContain("_http");
+    expect(serialized).not.toContain("apiKey");
+    const parsed = JSON.parse(serialized);
+    expect(parsed.id).toBe("agt_01j9876543210fedcba");
+    expect(parsed.agent_handle).toBe("sales-bot");
+    expect(parsed.mailbox.email_address).toBe("sales-bot@wireboxmail.com");
+  });
 });

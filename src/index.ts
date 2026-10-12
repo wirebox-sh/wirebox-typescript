@@ -17,6 +17,25 @@ export { WebhooksClient } from "./webhooks.js";
 export { verifyWebhook } from "./verify_webhook.js";
 export { resolveApiKey } from "./credentials.js";
 
+// Vault
+export { VaultClient, UnlockedVault } from "./vault/client.js";
+export type { VaultInitializeResult } from "./vault/client.js";
+export { VaultSecretType } from "./vault/types.js";
+export type {
+  LoginPayload,
+  ApiKeyPayload,
+  OtherPayload,
+  SecretPayload,
+  VaultSecretSummary,
+  DecryptedSecret,
+  VaultInfo,
+  VaultAccessGrant,
+} from "./vault/types.js";
+export { TOTPAlgorithm, generateTotp, parseTotpUri } from "./vault/totp.js";
+export type { TOTPConfig, TOTPCode } from "./vault/totp.js";
+export { generateVaultKey } from "./vault/crypto.js";
+export type { KdfParams } from "./vault/crypto.js";
+
 // Errors
 export {
   WireboxError,
@@ -34,6 +53,11 @@ export {
   FreeTierLimitExceededError,
   InvalidVerificationCodeError,
   VerificationCodeExpiredError,
+  VaultNotInitializedError,
+  VaultAlreadyInitializedError,
+  InvalidVaultKeyError,
+  VaultSecretNotFoundError,
+  VaultSecretTypeError,
   parseApiError,
 } from "./errors.js";
 

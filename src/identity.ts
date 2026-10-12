@@ -123,6 +123,32 @@ export class AgentIdentity {
     this._http = http;
   }
 
+  /**
+   * Serialize only the public identity data. This keeps the internal HTTP
+   * transport (which holds the API key) and resource clients out of
+   * `JSON.stringify(identity)` output, so credentials never leak into logs,
+   * CLI `--json` output, or other serialized representations.
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      organization_id: this.organization_id,
+      agent_handle: this.agent_handle,
+      display_name: this.display_name,
+      description: this.description,
+      status: this.status,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+      mailbox: this.mailbox,
+      tunnel: this.tunnel,
+      imessage_enabled: this.imessage_enabled,
+      mail_filter_mode: this.mail_filter_mode,
+      mail_inbound_filter_mode: this.mail_inbound_filter_mode,
+      mail_outbound_filter_mode: this.mail_outbound_filter_mode,
+      mailPolicy: this.mailPolicy,
+    };
+  }
+
   // ==========================================================================
   // Identity Lifecycle Methods
   // ==========================================================================
