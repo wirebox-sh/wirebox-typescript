@@ -11,6 +11,7 @@ import { IdentityMailRulesClient } from "./mail_rules.js";
 import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { WebhooksClient } from "./webhooks.js";
+import { A2AIdentityClient, A2AClient } from "./a2a/index.js";
 import type {
   CreateDraftParams,
   CreateWebhookParams,
@@ -79,6 +80,7 @@ export class AgentIdentity {
   readonly mail_outbound_filter_mode?: "whitelist" | "blacklist";
   readonly mailPolicy: MailPolicy;
   readonly mailRules: IdentityMailRulesClient;
+  readonly a2a: A2AIdentityClient;
 
   private readonly _http: HttpTransport;
 
@@ -119,6 +121,12 @@ export class AgentIdentity {
       status: "active",
       is_connected: false,
     };
+
+    this.a2a = new A2AIdentityClient({
+      handle: this.agent_handle,
+      identityId: this.id,
+      http,
+    });
 
     this._http = http;
   }
@@ -762,4 +770,11 @@ export class AgentIdentity {
       return phone.messages.markRead(this.agent_handle, messageId, options);
     },
   };
+
+  /**
+   * Return the A2A 1.0 JSON-RPC client pre-configured with this identity's origin and credentials.
+   */
+  a2aClient(): A2AClient {
+    return this.a2a.client;
+  }
 }

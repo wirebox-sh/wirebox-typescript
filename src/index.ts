@@ -36,6 +36,33 @@ export type { TOTPConfig, TOTPCode } from "./vault/totp.js";
 export { generateVaultKey } from "./vault/crypto.js";
 export type { KdfParams } from "./vault/crypto.js";
 
+// A2A Protocol (Agent-to-Agent 1.0)
+export {
+  A2AClient,
+  A2AIdentityClient,
+  TaskHandle,
+  A2AProtocolError,
+  type A2APart,
+  type A2AMessage,
+  type A2AArtifact,
+  type A2ASkill,
+  type A2ACapabilities,
+  type A2AInterface,
+  type A2ACard,
+  type A2AResolvedTarget,
+  type A2ATaskState,
+  type A2ATaskStatus,
+  type A2ATaskRequester,
+  type A2ATask,
+  type A2AReplyIntent,
+  type A2AReplyOptions,
+  type A2ATaskListOptions,
+  type A2ACallOptions,
+  type A2AWatchOptions,
+  type A2AWatchEvent,
+  type A2ASettings,
+} from "./a2a/index.js";
+
 // Errors
 export {
   WireboxError,
