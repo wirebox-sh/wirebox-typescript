@@ -14,6 +14,7 @@ import { PhoneClient } from "./phone.js";
 import { TunnelsClient } from "./tunnels.js";
 import { VaultClient } from "./vault/client.js";
 import { WebhooksClient } from "./webhooks.js";
+import { A2AClient } from "./a2a/index.js";
 import type {
   AgentSignupParams,
   AgentSignupResult,
@@ -37,6 +38,7 @@ export class Wirebox {
   readonly phone: PhoneClient;
   readonly mailRules: MailRulesClient;
   readonly vault: VaultClient;
+  readonly a2a: A2AClient;
   private readonly _http: HttpTransport;
   private readonly _apiKey?: string;
 
@@ -59,6 +61,9 @@ export class Wirebox {
     this.phone = new PhoneClient(this._http);
     this.mailRules = new MailRulesClient(this._http);
     this.vault = new VaultClient(this._http);
+    this.a2a = new A2AClient(apiKey, baseUrl, {
+      requestTimeoutMs: options?.timeoutMs,
+    });
   }
 
   // ==========================================================================
